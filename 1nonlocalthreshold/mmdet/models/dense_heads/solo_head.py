@@ -262,7 +262,24 @@ class SOLOHead(nn.Module):
     def forward_single_after(self, x, idx, feats_all=None,img_metas=None, eval=False, upsampled_size=None):
         seg_num_grid = self.seg_num_grids[idx]
         feats_all=F.interpolate(feats_all,size=seg_num_grid,mode='bilinear',align_corners=True)
-        
+
+        # f=f.reshape(52,52,52,52)
+        # human_map = human_map.reshape(52,52,52,52)
+        # for i in range(0,52,3):
+        #     for j in range(0,52,3):
+        # for i in range(feats_all.shape[1]):
+        #     plt.subplot(2,3,1)
+        #     plt.imshow(self.sa_list[idx](x)[0][0].cpu().numpy())
+        #     plt.subplot(2,3,2)
+        #     plt.imshow(feats_all[0][i].cpu().numpy())
+        #     plt.subplot(2,3,3)
+        #     plt.imshow((self.sa_list[idx](x)*feats_all)[0][i].cpu().numpy())
+        #     plt.subplot(2,3,4)
+        #     plt.imshow((x)[0][i].cpu().numpy())
+        #     plt.subplot(2,3,5)
+        #     plt.imshow((self.sa_list[idx](x)*feats_all+x)[0][i].cpu().numpy())
+        #     plt.show()
+
         cate_feat=self.sa_list[idx](x)*feats_all+x
         for i, cate_layer in enumerate(self.cate_convs_after):
             cate_feat = cate_layer(cate_feat)

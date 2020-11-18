@@ -71,13 +71,13 @@ class _NonLocalBlockND(nn.Module):
                         kernel_size=1, stride=1, padding=0),
                 bn(self.in_channels)
             )
-            nn.init.constant_(self.W[1].weight, 0)
-            nn.init.constant_(self.W[1].bias, 0)
+            # nn.init.constant_(self.W[1].weight, 0)
+            # nn.init.constant_(self.W[1].bias, 0)
         else:
             self.W = conv_nd(in_channels=self.inter_channels, out_channels=self.in_channels,
                              kernel_size=1, stride=1, padding=0)
-            nn.init.constant_(self.W.weight, 0)
-            nn.init.constant_(self.W.bias, 0)
+            # nn.init.constant_(self.W.weight, 0)
+            # nn.init.constant_(self.W.bias, 0)
 
         self.theta = conv_nd(in_channels=self.in_channels, out_channels=self.inter_channels,
                              kernel_size=1, stride=1, padding=0)
@@ -154,8 +154,14 @@ class _NonLocalBlockND(nn.Module):
         y = y.permute(0, 2, 1).contiguous()
         y = y.view(batch_size, self.inter_channels, *feats_all.size()[2:])
         W_y = self.W(y)
+        # for i in range(W_y.shape[1]):
+        #     plt.subplot(1,2,1)
+        #     plt.imshow(W_y[0][i].cpu().numpy())
+        #     plt.subplot(1,2,2)
+        #     plt.imshow(feats_all[0][i].cpu().numpy())
+        #     plt.show()
 
-        return W_y
+        return W_y+feats_all
 
     def minmaxscaler(self,data):
         amax=torch.max(data)
