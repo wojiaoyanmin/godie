@@ -155,10 +155,12 @@ class _NonLocalBlockND(nn.Module):
         y = y.view(batch_size, self.inter_channels, *feats_all.size()[2:])
         W_y = self.W(y)
         # for i in range(W_y.shape[1]):
-        #     plt.subplot(1,2,1)
+        #     plt.subplot(1,3,1)
         #     plt.imshow(W_y[0][i].cpu().numpy())
-        #     plt.subplot(1,2,2)
+        #     plt.subplot(1,3,2)
         #     plt.imshow(feats_all[0][i].cpu().numpy())
+        #     plt.subplot(1,3,3)
+        #     plt.imshow((W_y+feats_all)[0][i].cpu().numpy())
         #     plt.show()
 
         return W_y+feats_all

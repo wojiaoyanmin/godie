@@ -263,10 +263,7 @@ class SOLOHead(nn.Module):
         seg_num_grid = self.seg_num_grids[idx]
         feats_all=F.interpolate(feats_all,size=seg_num_grid,mode='bilinear',align_corners=True)
 
-        # f=f.reshape(52,52,52,52)
-        # human_map = human_map.reshape(52,52,52,52)
-        # for i in range(0,52,3):
-        #     for j in range(0,52,3):
+
         # for i in range(feats_all.shape[1]):
         #     plt.subplot(2,3,1)
         #     plt.imshow(self.sa_list[idx](x)[0][0].cpu().numpy())
