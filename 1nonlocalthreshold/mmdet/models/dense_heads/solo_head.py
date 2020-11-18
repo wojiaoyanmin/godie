@@ -262,6 +262,7 @@ class SOLOHead(nn.Module):
     def forward_single_after(self, x, idx, feats_all=None,img_metas=None, eval=False, upsampled_size=None):
         seg_num_grid = self.seg_num_grids[idx]
         feats_all=F.interpolate(feats_all,size=seg_num_grid,mode='bilinear',align_corners=True)
+        
         cate_feat=self.sa_list[idx](x)*feats_all+x
         for i, cate_layer in enumerate(self.cate_convs_after):
             cate_feat = cate_layer(cate_feat)

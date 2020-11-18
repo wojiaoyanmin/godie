@@ -131,10 +131,10 @@ class _NonLocalBlockND(nn.Module):
         f = F.softmax(f, dim=-1)
 
 
-        # f=f.reshape(40,40,40,40)
-        # human_map = human_map.reshape(40,40,40,40)
-        # for i in range(0,40,6):
-        #     for j in range(0,40,6):
+        # f=f.reshape(52,52,52,52)
+        # human_map = human_map.reshape(52,52,52,52)
+        # for i in range(0,52,3):
+        #     for j in range(0,52,3):
                 
         #         plt.subplot(1,3,1)
         #         plt.plot(j,i,'ks')
@@ -144,7 +144,7 @@ class _NonLocalBlockND(nn.Module):
         #         plt.imshow((human_map)[i][j].cpu().numpy())
         #         plt.subplot(1,3,3)
         #         plt.plot(j,i,'ks')
-        #         plt.imshow((f+human_map)[i][j].cpu().numpy())
+        #         plt.imshow(((f+human_map)/2)[i][j].cpu().numpy())
         #         plt.show()
 
 

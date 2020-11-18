@@ -21,7 +21,7 @@ from .ssd_head import SSDHead
 from .solo_head import SOLOHead
 from .rcca import RCCA
 from .mask_feat_head import MaskFeatHead
-from .non_local import NONLocalBlock2D
+from .non_local import NONLocalBlock2D,SpatialAttention
 from .global_reasoning import GloRe_Unit_2D
 from .cate_feat_head import CateFeatHead
 from .ymlocal import YMLocal
@@ -33,5 +33,5 @@ __all__ = [
     'FreeAnchorRetinaHead', 'ATSSHead', 'FSAFHead', 'NASFCOSHead',
     'PISARetinaHead', 'PISASSDHead', 'GFLHead', 'CornerHead','SOLOHead',
     'RCCA','MaskFeatHead','NONLocalBlock2D','GloRe_Unit_2D','CateFeatHead','YMLocal',
-    'ASPP'
+    'ASPP','SpatialAttention'
 ]

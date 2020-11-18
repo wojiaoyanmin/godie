@@ -2,7 +2,7 @@ import mmcv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mmcv.cnn import normal_init, bias_init_with_prob, ConvModule
+from mmcv.cnn import normal_init, bias_init_with_prob, ConvModule,constant_init
 from mmdet.core import multi_apply, bbox2roi, matrix_nms
 from ..builder import HEADS, build_loss, build_head
 from scipy import ndimage
@@ -10,6 +10,7 @@ import pdb
 import matplotlib.pyplot as plt
 from torch.nn import functional as F
 
+@HEADS.register_module
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super(SpatialAttention, self).__init__()
@@ -27,6 +28,9 @@ class SpatialAttention(nn.Module):
         x = self.conv1(x)
         return self.sigmoid(x)
 
+    def init_weights(self):
+        pass
+
 
 @HEADS.register_module
 class _NonLocalBlockND(nn.Module):
@@ -34,7 +38,6 @@ class _NonLocalBlockND(nn.Module):
         super(_NonLocalBlockND, self).__init__()
 
         assert dimension in [1, 2, 3]
-        self.sa=SpatialAttention()
         self.dimension = dimension
         self.sub_sample = sub_sample
 
@@ -82,24 +85,31 @@ class _NonLocalBlockND(nn.Module):
                            kernel_size=1, stride=1, padding=0)
         self.sum_after = conv_nd(in_channels=self.in_channels, out_channels=self.in_channels,
                            kernel_size=1, stride=1, padding=0)
-        self.human = conv_nd(in_channels=self.in_channels, out_channels=self.inter_channels,
+        self.human_theta = conv_nd(in_channels=self.in_channels, out_channels=self.inter_channels,
                              kernel_size=1, stride=1, padding=0)
-
+        self.human_phi = conv_nd(in_channels=self.in_channels, out_channels=self.inter_channels,
+                             kernel_size=1, stride=1, padding=0)
         if sub_sample:
             self.g = nn.Sequential(self.g, max_pool_layer)
             self.phi = nn.Sequential(self.phi, max_pool_layer)
 
-    def forward(self, x, feats_all=None,human_feats=None):
+    def forward(self, feats_all=None,human_feats=None):
         '''
         :param x: (b, c, t, h, w)
         :return:
         '''
+
         query = feats_all
         key = feats_all
         value = feats_all
-        batch_size = x.size(0)
-        human = self.human(human_feats).view(batch_size, self.inter_channels, -1)
-        human_map = torch.matmul(human.permute(0, 2, 1), human)
+        batch_size = feats_all.size(0)
+        human_query = self.human_theta(human_feats).view(batch_size, self.inter_channels, -1).permute(0, 2, 1)
+        human_key =self.human_phi(human_feats).view(batch_size, self.inter_channels, -1)
+        human_map = torch.matmul(human_query, human_key)
+        
+        human_map = (self.inter_channels ** -.5) * human_map   
+
+        human_map = F.softmax(human_map, dim=-1)
 
         # human_map=human_map.reshape(40,40,40,40)
         # for i in range(0,40,6):
@@ -107,9 +117,7 @@ class _NonLocalBlockND(nn.Module):
         #         plt.plot(j,i,'ks')
         #         plt.imshow(human_map[i][j].cpu().numpy())
         #         plt.show()
-
-        human_map = F.softmax(human_map, dim=-1)*human_map.shape[-1]
-
+        
         
 
         g_x = self.g(value).view(batch_size, self.inter_channels, -1)
@@ -119,27 +127,40 @@ class _NonLocalBlockND(nn.Module):
         
         phi_x = self.phi(key).view(batch_size, self.inter_channels, -1)
         f = torch.matmul(theta_x, phi_x)
+        f = (self.inter_channels ** -.5) * f   
+        f = F.softmax(f, dim=-1)
 
 
-        f = f * human_map
-
-        # f=f.reshape(40,40,40,40)
-        # for i in range(0,40,6):
-        #     for j in range(0,40,6):
+        # f=f.reshape(52,52,52,52)
+        # human_map = human_map.reshape(52,52,52,52)
+        # for i in range(0,52,3):
+        #     for j in range(0,52,3):
+                
+        #         plt.subplot(1,3,1)
         #         plt.plot(j,i,'ks')
         #         plt.imshow(f[i][j].cpu().numpy())
+        #         plt.subplot(1,3,2)
+        #         plt.plot(j,i,'ks')
+        #         plt.imshow((human_map)[i][j].cpu().numpy())
+        #         plt.subplot(1,3,3)
+        #         plt.plot(j,i,'ks')
+        #         plt.imshow(((f+human_map)/2)[i][j].cpu().numpy())
         #         plt.show()
 
-        f_div_C = F.softmax(f, dim=-1)
+
+        f_div_C = (human_map+f)/2
 
         y = torch.matmul(f_div_C, g_x)
         y = y.permute(0, 2, 1).contiguous()
-        y = y.view(batch_size, self.inter_channels, *x.size()[2:])
-        W_y = self.W(y)*self.sa(x)
+        y = y.view(batch_size, self.inter_channels, *feats_all.size()[2:])
+        W_y = self.W(y)
 
-        z = W_y + x
+        return W_y
 
-        return z
+    def minmaxscaler(self,data):
+        amax=torch.max(data)
+        amin=torch.min(data)
+        return (data-amin)/(amax-amin)
 
 
 class NONLocalBlock1D(_NonLocalBlockND):
