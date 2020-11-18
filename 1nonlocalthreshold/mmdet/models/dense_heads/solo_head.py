@@ -157,6 +157,8 @@ class SOLOHead(nn.Module):
             self.ins_feat_channels, self.kernel_out_channels, 3, padding=1)
 
     def init_weights(self):
+        for m in self.sa_list:
+            m.init_weights()
         self.cate_feat_head.init_weights()
         for m in self.cate_convs:
             normal_init(m.conv, std=0.01)

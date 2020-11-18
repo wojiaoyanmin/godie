@@ -2,7 +2,7 @@ import mmcv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mmcv.cnn import normal_init, bias_init_with_prob, ConvModule
+from mmcv.cnn import normal_init, bias_init_with_prob, ConvModule,constant_init
 from mmdet.core import multi_apply, bbox2roi, matrix_nms
 from ..builder import HEADS, build_loss, build_head
 from scipy import ndimage
@@ -27,6 +27,9 @@ class SpatialAttention(nn.Module):
         x = torch.cat([avg_out, max_out], dim=1)
         x = self.conv1(x)
         return self.sigmoid(x)
+
+    def init_weights(self):
+        pass
 
 
 @HEADS.register_module
