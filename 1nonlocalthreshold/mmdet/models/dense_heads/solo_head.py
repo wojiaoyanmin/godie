@@ -44,14 +44,15 @@ class SOLOHead(nn.Module):
                  insert_point=1,
                  aspp=None,
                  non_local=None,
+                 sa=None,
                  loss_ins=None,
                  loss_cate=None,
                  conv_cfg=None,
                  norm_cfg=None):
         super(SOLOHead, self).__init__()
-        self.non_local_list=nn.ModuleList()
+        self.sa_list=nn.ModuleList()
         for i in range(len(num_grids)):
-            self.non_local_list.append(build_head(non_local))
+            self.sa_list.append(build_head(sa))
         self.non_local=build_head(non_local)
         self.insert_point= insert_point
         self.num_classes = num_classes  # 不算background
@@ -208,10 +209,11 @@ class SOLOHead(nn.Module):
             feats_all.append(feat)
         feats_all = torch.sum(torch.cat(feats_all, dim=0), dim=0)
         feats_all = self.all_conv(feats_all)
+        human_feats = F.interpolate(human_feats, size=self.human_scale, mode='bilinear', align_corners=True)
+        feats_all=self.non_local(feats_all=feats_all,human_feats=human_feats)
         cate_pred, _ = multi_apply(self.forward_single_after, cate_feat,
                                    list(range(len(self.seg_num_grids))),
                                    feats_all=feats_all,
-                                   human_feats=human_feats.detach(),
                                    img_metas=img_metas,
                                    eval=eval, upsampled_size=upsampled_size)
 
@@ -255,11 +257,10 @@ class SOLOHead(nn.Module):
 
         return cate_feat, kernel_pred
 
-    def forward_single_after(self, x, idx, feats_all=None, human_feats=None, img_metas=None, eval=False, upsampled_size=None):
+    def forward_single_after(self, x, idx, feats_all=None,img_metas=None, eval=False, upsampled_size=None):
         seg_num_grid = self.seg_num_grids[idx]
-        feats_all = F.interpolate(feats_all, size=seg_num_grid, mode='bilinear', align_corners=True)
-        human_feats = F.interpolate(human_feats, size=seg_num_grid, mode='bilinear', align_corners=True)
-        cate_feat=self.non_local_list[idx](x,feats_all=feats_all,human_feats=human_feats)
+        feats_all=F.interpolate(feats_all,size=seg_num_grid,mode='bilinear',align_corners=True)
+        cate_feat=self.sa_list[idx](x)*feats_all+x
         for i, cate_layer in enumerate(self.cate_convs_after):
             cate_feat = cate_layer(cate_feat)
         cate_pred = self.solo_cate(cate_feat)
