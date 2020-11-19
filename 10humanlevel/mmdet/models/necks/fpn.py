@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn import ConvModule, xavier_init
-
+import pdb
 from mmdet.core import auto_fp16
 from ..builder import NECKS
 
@@ -146,8 +146,9 @@ class FPN(nn.Module):
                     in_channels,
                     out_channels,
                     3,
-                    stride=2,
-                    padding=1,
+                    dilation=2,
+                    stride=1,
+                    padding=2,
                     conv_cfg=conv_cfg,
                     norm_cfg=norm_cfg,
                     act_cfg=act_cfg,

@@ -30,6 +30,7 @@ class SOLOHead(nn.Module):
                  stacked_convs=4,
                  cate_stacked_convs=5,
                  cate_stacked_convs_after=2,
+                 human_stacked_convs=4,
                  ins_feat_channels=512,
                  cate_feat_channels=512,
                  strides=None,
@@ -60,6 +61,7 @@ class SOLOHead(nn.Module):
         self.stacked_convs = stacked_convs
         self.cate_stacked_convs =cate_stacked_convs
         self.cate_stacked_convs_after = cate_stacked_convs_after
+        self.human_stacked_convs =human_stacked_convs
         self.ins_feat_channels = ins_feat_channels
         self.cate_feat_channels = cate_feat_channels
         self.strides = strides
@@ -81,11 +83,25 @@ class SOLOHead(nn.Module):
         self._init_layers()
 
     def _init_layers(self):
-     
+        assert len(self.scale_ranges)==len(self.seg_num_grids)==len(self.strides)
         cfg_conv = self.conv_cfg
         norm_cfg = self.norm_cfg
         self.cate_convs = nn.ModuleList()
         self.kernel_convs = nn.ModuleList()
+        self.human_convs = nn.ModuleList()
+        for i in range(self.human_stacked_convs):
+            chn = self.in_channels + 2 if i == 0 else self.cate_feat_channels
+            self.human_convs.append(
+                ConvModule(
+                    chn,
+                    self.cate_feat_channels,
+                    3,
+                    stride=1,
+                    padding=1,
+                    conv_cfg=cfg_conv,
+                    norm_cfg=norm_cfg,
+                    bias=norm_cfg is None))
+
         for i in range(self.stacked_convs):
             
             chn = self.in_channels + 2 if i == 0 else self.ins_feat_channels
@@ -158,6 +174,9 @@ class SOLOHead(nn.Module):
         self.solo_kernel = nn.Conv2d(
             self.ins_feat_channels, self.kernel_out_channels, 3, padding=1)
 
+        self.solo_human = nn.Conv2d(
+            self.cate_feat_channels,self.grid_big**2,3,padding=1)
+
     def init_weights(self):
         for m in self.sa_list:
             m.init_weights()
@@ -170,9 +189,12 @@ class SOLOHead(nn.Module):
             normal_init(m.conv, std=0.01)
         for m in self.kernel_convs:
             normal_init(m.conv, std=0.01)
+        for m in self.human_convs:
+            normal_init(m.conv, std=0.01)
         bias_cate = bias_init_with_prob(0.01)
         normal_init(self.solo_cate, std=0.01, bias=bias_cate)
         normal_init(self.solo_kernel, std=0.01)
+        normal_init(self.solo_human, std=0.01)
         normal_init(self.all_conv.conv, std=0.01)
 
     def forward(self, feats,img_metas=None, eval=False):
@@ -197,9 +219,22 @@ class SOLOHead(nn.Module):
         plt.imshow(torch.max(showimg[3][0],0)[0].detach().cpu().numpy())
         plt.show()
         '''
-        human_feats,human_pred = self.cate_feat_head(feats[0:-1])
+        
+        human_feats=F.interpolate(feats[-1], scale_factor=2, mode='bilinear')
+        x_range = torch.linspace(-1, 1, human_feats.shape[-1], device=human_feats.device)
+        y_range = torch.linspace(-1, 1, human_feats.shape[-2], device=human_feats.device)
+        y, x = torch.meshgrid(y_range, x_range)
+        y = y.expand([human_feats.shape[0], 1, -1, -1])
+        x = x.expand([human_feats.shape[0], 1, -1, -1])
+        coord_feat = torch.cat([x, y], 1)
+        human_feats = torch.cat([human_feats, coord_feat], 1)
+        for conv in self.human_convs:
+            human_feats=conv(human_feats)
+        human_pred=self.solo_human(human_feats)
         human_pred = human_pred.sigmoid()
-        feats = self.split_feats(feats)
+
+
+        feats = self.split_feats(feats[:-1])
 
         featmap_sizes = [featmap.size()[-2:] for featmap in feats]
         upsampled_size = (featmap_sizes[0][0] * 2, featmap_sizes[0][1] * 2)
@@ -209,7 +244,7 @@ class SOLOHead(nn.Module):
                                             eval=eval, upsampled_size=upsampled_size)
         feats_all = []
         
-        for conv, feat in zip(self.lateral_convs, cate_feat[::2]):
+        for conv, feat in zip(self.lateral_convs, cate_feat):
             feat = conv(F.interpolate(feat, size=self.human_scale, mode='bilinear', align_corners=True)).unsqueeze(0)
             feats_all.append(feat)
         feats_all = torch.sum(torch.cat(feats_all, dim=0), dim=0)
@@ -228,8 +263,7 @@ class SOLOHead(nn.Module):
         return (F.interpolate(feats[0], scale_factor=0.5, mode='bilinear'),
                 feats[1],
                 feats[2],
-                feats[3],
-                F.interpolate(feats[4], scale_factor=2, mode='bilinear'))
+                F.interpolate(feats[3], scale_factor=2, mode='bilinear'))
 
     def forward_single(self, x, idx,  img_metas=None, eval=False, upsampled_size=None):
         ins_kernel_feat = x
@@ -313,8 +347,7 @@ class SOLOHead(nn.Module):
         human_label=torch.cat(human_label_list)
         human_ind=torch.cat(human_ind_list)
         human_label=human_label[human_ind]
-
-        human_pred=human_pred.reshape(-1,mask_feat_size[0]//2,mask_feat_size[1]//2)
+        human_pred=human_pred.reshape(-1,mask_feat_size[0]//4,mask_feat_size[1]//4)
         human_pred=human_pred[human_ind]
         loss_human=self.loss_human(human_pred,human_label)
         
@@ -403,7 +436,7 @@ class SOLOHead(nn.Module):
                      gt_masks_raw,
                      mask_feat_size):
         device = gt_instance_raw[0].device
-        human_label = torch.zeros([self.grid_big ** 2, mask_feat_size[0]//2, mask_feat_size[1]//2], dtype=torch.uint8,
+        human_label = torch.zeros([self.grid_big ** 2, mask_feat_size[0]//4, mask_feat_size[1]//4], dtype=torch.uint8,
                                   device=device)
         human_ind = torch.zeros([self.grid_big ** 2], dtype=torch.bool, device=device)
         human_ids = torch.unique(gt_instance_raw)
@@ -442,7 +475,7 @@ class SOLOHead(nn.Module):
             left = max(coord_w - 1, left_box)
             right = min(right_box, coord_w + 1)
 
-            output_stride = 8
+            output_stride = 16
             gt_masks = mmcv.imrescale(gt_masks, scale=1. / output_stride)
             gt_masks = torch.Tensor(gt_masks)
             for i in range(top, down + 1):
