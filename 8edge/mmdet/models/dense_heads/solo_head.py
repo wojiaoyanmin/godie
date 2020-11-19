@@ -12,6 +12,7 @@ from mmdet.ops import ConvDW
 import os.path as osp
 import numpy as np
 INF = 1e8
+import cv2
 
 def points_nms(heat, kernel=2):
     # kernel must be 2
@@ -40,6 +41,7 @@ class SOLOHead(nn.Module):
                  num_grids=None,
                  ins_out_channels=None,
                  cate_feat_head=None,
+                 mask_feat_head=None,
                  loss_human=None,
                  insert_point=1,
                  aspp=None,
@@ -47,6 +49,7 @@ class SOLOHead(nn.Module):
                  sa=None,
                  loss_ins=None,
                  loss_cate=None,
+                 loss_edge=None,
                  conv_cfg=None,
                  norm_cfg=None):
         super(SOLOHead, self).__init__()
@@ -71,10 +74,11 @@ class SOLOHead(nn.Module):
         self.ins_out_channels = ins_out_channels
         self.kernel_out_channels = ins_out_channels*1*1
         self.cate_feat_head = build_head(cate_feat_head)
-        
+        self.mask_feat_head = build_head(mask_feat_head)
         self.loss_human = build_loss(loss_human)
         self.loss_ins = build_loss(loss_ins)
         self.loss_cate = build_loss(loss_cate)
+        self.loss_edge = build_loss(loss_edge)
         self.conv_cfg=conv_cfg
         self.norm_cfg = norm_cfg
 
@@ -161,6 +165,7 @@ class SOLOHead(nn.Module):
     def init_weights(self):
         for m in self.sa_list:
             m.init_weights()
+        self.mask_feat_head.init_weights()
         self.cate_feat_head.init_weights()
         for m in self.cate_convs:
             normal_init(m.conv, std=0.01)
@@ -197,7 +202,8 @@ class SOLOHead(nn.Module):
         plt.imshow(torch.max(showimg[3][0],0)[0].detach().cpu().numpy())
         plt.show()
         '''
-        human_feats,human_pred = self.cate_feat_head(feats)
+        human_feats,human_pred,edge_feats,edge_pred = self.cate_feat_head(feats)
+        ins_pred = self.mask_feat_head(feats,edge_feats)
         human_pred = human_pred.sigmoid()
         feats = self.split_feats(feats)
 
@@ -221,7 +227,7 @@ class SOLOHead(nn.Module):
                                    img_metas=img_metas,
                                    eval=eval, upsampled_size=upsampled_size)
 
-        return cate_pred, kernel_pred, human_pred
+        return cate_pred, kernel_pred, human_pred, edge_pred,ins_pred
 
     def split_feats(self, feats):
         return (F.interpolate(feats[0], scale_factor=0.5, mode='bilinear'),
@@ -291,6 +297,7 @@ class SOLOHead(nn.Module):
              cate_preds,
              kernel_preds,
              human_pred,
+             edge_pred,
              ins_pred,
              gt_bbox_list,
              gt_label_list,
@@ -300,7 +307,7 @@ class SOLOHead(nn.Module):
              cfg,
              gt_bboxes_ignore=None):
         mask_feat_size = ins_pred.size()[-2:]
-
+        #human
         human_label_list,human_ind_list=multi_apply(
             self.human_single,
             gt_instance_list,
@@ -311,11 +318,22 @@ class SOLOHead(nn.Module):
         human_label=torch.cat(human_label_list)
         human_ind=torch.cat(human_ind_list)
         human_label=human_label[human_ind]
-
         human_pred=human_pred.reshape(-1,mask_feat_size[0]//2,mask_feat_size[1]//2)
         human_pred=human_pred[human_ind]
         loss_human=self.loss_human(human_pred,human_label)
         
+
+        #edge
+        human_edge_list,_ = multi_apply(
+            self.human_edge_single,
+            gt_instance_list,
+            gt_bbox_list,
+            gt_mask_list,
+            mask_feat_size=mask_feat_size
+        )
+        human_edge_label=torch.cat(human_edge_list)
+        loss_edge =self.loss_edge(edge_pred,human_edge_label)
+
         ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list = multi_apply(
             self.solov2_target_single,
             gt_bbox_list,
@@ -393,7 +411,8 @@ class SOLOHead(nn.Module):
         return dict(
             loss_ins=loss_ins,
             loss_cate=loss_cate,
-            loss_human=loss_human)
+            loss_human=loss_human,
+            loss_edge =loss_edge)
 
     def human_single(self,
                      gt_instance_raw,
@@ -599,7 +618,7 @@ class SOLOHead(nn.Module):
             
         return ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list
 
-    def get_seg(self, cate_preds, kernel_preds, human_preds, seg_pred, img_metas, cfg, rescale=None):
+    def get_seg(self, cate_preds, kernel_preds, human_preds, edge_preds, seg_pred, img_metas, cfg, rescale=None):
         num_levels = len(cate_preds)
         featmap_size = seg_pred.size()[-2:]
 

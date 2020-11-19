@@ -14,25 +14,31 @@ class CateFeatHead(nn.Module):
     def __init__(self,
                  in_channels,
                  out_channels,
+                 out_edge_channels,
                  start_level,
                  end_level,
                  num_classes,
+                 num_edge_classes,
                  conv_cfg=None,
                  norm_cfg=None,
                  num_grid=40,
-                 stack_convs=2):
+                 stack_convs=2,
+                 stacked_edge_convs=1,):
         super(CateFeatHead, self).__init__()
 
         self.in_channels = in_channels
         self.out_channels = out_channels
+        self.out_edge_channels = out_edge_channels
         self.start_level = start_level
         self.end_level = end_level
         assert start_level >= 0 and end_level >= start_level
         self.num_classes = num_classes
+        self.num_edge_classes = num_edge_classes
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.num_grid=num_grid
         self.stack_convs=stack_convs
+        self.stacked_edge_convs = stacked_edge_convs
 
         self.convs_all_levels = nn.ModuleList()
         for i in range(self.start_level, self.end_level + 1):
@@ -95,10 +101,29 @@ class CateFeatHead(nn.Module):
                     padding=1,
                     conv_cfg=self.conv_cfg,
                     norm_cfg=self.norm_cfg))
+
+        self.edge_convs=nn.ModuleList()
+        for i in range(self.stacked_edge_convs):
+            chn = self.out_channels if i==0 else self.out_edge_channels
+            self.edge_convs.append(
+                ConvModule(
+                    chn,
+                    self.out_edge_channels,
+                    3,
+                    padding=1,
+                    conv_cfg=self.conv_cfg,
+                    norm_cfg=self.norm_cfg))
         self.conv_pred = nn.Sequential(
             nn.Conv2d(
                 self.out_channels,
                 self.num_classes,
+                1,
+                padding=0),
+        )
+        self.edge_conv_pred = nn.Sequential(
+            nn.Conv2d(
+                self.out_edge_channels,
+                self.num_edge_classes,
                 1,
                 padding=0),
         )
@@ -124,10 +149,21 @@ class CateFeatHead(nn.Module):
                 input_p = torch.cat([input_p, coord_feat], 1)
 
             feature_add_all_level += self.convs_all_levels[i](input_p)
-        feature_add_all_level=F.interpolate(feature_add_all_level,
-                                            scale_factor=0.5,
+        feature_human=feature_add_all_level
+        feature_edge=feature_add_all_level
+        feature_human=F.interpolate(feature_human,
+                                  scale_factor=0.5,
                                   mode='bilinear')
         for i,conv in enumerate(self.convs):
-            feature_add_all_level = conv(feature_add_all_level)
-        feature_pred = self.conv_pred(feature_add_all_level)
-        return feature_add_all_level,feature_pred
+            feature_human = conv(feature_human)
+        human_pred = self.conv_pred(feature_human)
+
+        for i,conv in enumerate(self.edge_convs):
+            feature_edge = conv(feature_edge)
+        edge_pred = feature_edge
+    
+        feature_edge=F.interpolate(feature_edge,
+                                  scale_factor=0.5,
+                                  mode='bilinear')
+        edge_pred = self.edge_conv_pred(edge_pred)
+        return feature_human,human_pred,feature_edge,edge_pred

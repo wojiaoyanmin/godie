@@ -17,7 +17,6 @@ class YMDetector(BaseDetector):
                  backbone,
                  neck=None,
                  ins_head=None,
-                 mask_feat_head=None,
                  train_cfg=None,
                  test_cfg=None,
                  pretrained=None):
@@ -26,9 +25,6 @@ class YMDetector(BaseDetector):
         
         if neck is not None:
             self.neck = build_neck(neck)
-        if mask_feat_head is not None:
-            self.mask_feat_head = build_head(mask_feat_head)
-            self.with_mask_feat_head=True
         # ins_head.update(train_cfg=train_cfg)
         # ins_head.update(test_cfg=test_cfg)
         self.ins_head = build_head(ins_head)
@@ -45,12 +41,6 @@ class YMDetector(BaseDetector):
                     m.init_weights()
             else:
                 self.neck.init_weights()
-        if self.with_mask_feat_head:
-            if isinstance(self.mask_feat_head, nn.Sequential):
-                for m in self.mask_feat_head:
-                    m.init_weights()
-            else:
-                self.mask_feat_head.init_weights()
         self.ins_head.init_weights()
 
     def extract_feat(self, img):
@@ -100,13 +90,8 @@ class YMDetector(BaseDetector):
         """
         x = self.extract_feat(img)#[1, 256, 258, 506,1, 128, 258, 506]    
         outs = self.ins_head(x,img_metas=img_metas)
-        if self.with_mask_feat_head:
-            mask_feat_pred = self.mask_feat_head(
-                x[self.mask_feat_head.
-                    start_level:self.mask_feat_head.end_level + 1])
-            loss_inputs = outs + (mask_feat_pred, gt_bboxes, gt_labels, gt_masks,gt_instances, img_metas, self.train_cfg)
-        else:
-            loss_inputs = outs + (gt_bboxes, gt_labels,gt_masks,gt_instances,img_metas, self.train_cfg)
+        
+        loss_inputs = outs + (gt_bboxes, gt_labels,gt_masks,gt_instances,img_metas, self.train_cfg)
         losses = self.ins_head.loss(
             *loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
         return losses
@@ -114,13 +99,7 @@ class YMDetector(BaseDetector):
     def simple_test(self, img, img_metas, rescale=False):
         x = self.extract_feat(img)
         outs = self.ins_head(x,img_metas=img_metas, eval=True)
-        if self.with_mask_feat_head:
-            mask_feat_pred = self.mask_feat_head(
-                x[self.mask_feat_head.
-                    start_level:self.mask_feat_head.end_level + 1])
-            seg_inputs = outs + (mask_feat_pred, img_metas, self.test_cfg, rescale)
-        else:
-            seg_inputs = outs + (img_metas, self.test_cfg, rescale)
+        seg_inputs = outs + (img_metas, self.test_cfg, rescale)
 
         seg_result = self.ins_head.get_seg(*seg_inputs)
         return seg_result

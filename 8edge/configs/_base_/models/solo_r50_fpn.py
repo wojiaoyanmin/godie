@@ -36,12 +36,23 @@ model=dict(
             type='CateFeatHead',
             in_channels=256,
             out_channels=512,
+            out_edge_channels=256,
             start_level=0,
             end_level=3,
             num_classes=16*16,
+            num_edge_classes=2,
             norm_cfg=dict(type='GN', num_groups=32, requires_grad=True),
             num_grid=64,
-            stack_convs=2),
+            stack_convs=2,
+            stacked_edge_convs=1),
+        mask_feat_head=dict(
+            type='MaskFeatHead',
+            in_channels=256,
+            out_channels=128,
+            start_level=0,
+            end_level=3,
+            num_classes=256,
+            norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)),
         insert_point=2,
         non_local=dict(
             type='NONLocalBlock2D',
@@ -60,16 +71,13 @@ model=dict(
             gamma=2.0,
             alpha=0.25,
             loss_weight=1.0),
+        loss_edge=dict(
+            type='CrossEntropyLoss',
+            use_sigmoid=False,
+            loss_weight=1.0),
         norm_cfg=dict(type='GN', num_groups=32, requires_grad=True),
         ),
-    mask_feat_head=dict(
-        type='MaskFeatHead',
-        in_channels=256,
-        out_channels=128,
-        start_level=0,
-        end_level=3,
-        num_classes=256,
-        norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)),
+    
 )
 train_cfg=dict()
 test_cfg=dict(

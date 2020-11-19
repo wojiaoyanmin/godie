@@ -48,7 +48,12 @@ class MaskFeatHead(nn.Module):
 
             for j in range(i):
                 if j == 0:
-                    chn = self.in_channels + 2 if i == 3 else self.in_channels
+                    if i==3:
+                        chn = self.in_channels + 2
+                    elif i==1:
+                        chn = self.in_channels*2
+                    else:
+                        chn = self.in_channels
                     one_conv = ConvModule(
                         chn,
                         self.out_channels,
@@ -96,11 +101,13 @@ class MaskFeatHead(nn.Module):
             if isinstance(m, nn.Conv2d):
                 normal_init(m, std=0.01)
 
-    def forward(self, inputs):
+    def forward(self, inputs,edge_feats):
         assert len(inputs) == (self.end_level - self.start_level + 1)
         feature_add_all_level = self.convs_all_levels[0](inputs[0])
         for i in range(1, len(inputs)):
             input_p = inputs[i]
+            if i ==1:
+                input_p = torch.cat([input_p, edge_feats], 1)
             if i == 3:
                 input_feat = input_p
                 x_range = torch.linspace(-1, 1, input_feat.shape[-1], device=input_feat.device)
@@ -110,7 +117,6 @@ class MaskFeatHead(nn.Module):
                 x = x.expand([input_feat.shape[0], 1, -1, -1])
                 coord_feat = torch.cat([x, y], 1)
                 input_p = torch.cat([input_p, coord_feat], 1)
-
             feature_add_all_level += self.convs_all_levels[i](input_p)
 
         feature_pred = self.conv_pred(feature_add_all_level)
