@@ -129,7 +129,7 @@ class SOLOHead(nn.Module):
                     bias=norm_cfg is None))
 
         self.lateral_convs=nn.ModuleList()
-        for i in range(len(self.seg_num_grids)):
+        for i in range(len(self.seg_num_grids)//2+1):
             self.lateral_convs.append(
                 ConvModule(
                     self.cate_feat_channels,
@@ -197,7 +197,7 @@ class SOLOHead(nn.Module):
         plt.imshow(torch.max(showimg[3][0],0)[0].detach().cpu().numpy())
         plt.show()
         '''
-        human_feats,human_pred = self.cate_feat_head(feats)
+        human_feats,human_pred = self.cate_feat_head(feats[0:-1])
         human_pred = human_pred.sigmoid()
         feats = self.split_feats(feats)
 
@@ -208,7 +208,8 @@ class SOLOHead(nn.Module):
                                             img_metas=img_metas,
                                             eval=eval, upsampled_size=upsampled_size)
         feats_all = []
-        for conv, feat in zip(self.lateral_convs, cate_feat):
+        
+        for conv, feat in zip(self.lateral_convs, cate_feat[::2]):
             feat = conv(F.interpolate(feat, size=self.human_scale, mode='bilinear', align_corners=True)).unsqueeze(0)
             feats_all.append(feat)
         feats_all = torch.sum(torch.cat(feats_all, dim=0), dim=0)
