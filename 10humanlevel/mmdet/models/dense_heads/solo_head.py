@@ -234,6 +234,7 @@ class SOLOHead(nn.Module):
         human_pred = human_pred.sigmoid()
 
 
+
         feats = self.split_feats(feats[:-1])
 
         featmap_sizes = [featmap.size()[-2:] for featmap in feats]
@@ -349,6 +350,9 @@ class SOLOHead(nn.Module):
         human_label=human_label[human_ind]
         human_pred=human_pred.reshape(-1,mask_feat_size[0]//4,mask_feat_size[1]//4)
         human_pred=human_pred[human_ind]
+        # for i in range(human_pred.shape[0]):
+        #     plt.imshow(human_pred[i].cpu().numpy())
+        #     plt.show()
         loss_human=self.loss_human(human_pred,human_label)
         
         ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list = multi_apply(
