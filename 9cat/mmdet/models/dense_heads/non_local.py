@@ -126,24 +126,16 @@ class _NonLocalBlockND(nn.Module):
         phi_x=torch.cat([phi_x,human_key],dim=1)
 
         f = torch.matmul(theta_x, phi_x)
-        f = (self.inter_channels*2 ** -.5) * f   
+
+        # f = (self.inter_channels*2 ** -.5) * f   
         f = F.softmax(f, dim=-1)
 
-
         # f=f.reshape(52,52,52,52)
-        # human_map = human_map.reshape(52,52,52,52)
         # for i in range(0,52,3):
         #     for j in range(0,52,3):
-                
-        #         plt.subplot(1,3,1)
+
         #         plt.plot(j,i,'ks')
         #         plt.imshow(f[i][j].cpu().numpy())
-        #         plt.subplot(1,3,2)
-        #         plt.plot(j,i,'ks')
-        #         plt.imshow((human_map)[i][j].cpu().numpy())
-        #         plt.subplot(1,3,3)
-        #         plt.plot(j,i,'ks')
-        #         plt.imshow(((f+human_map)/2)[i][j].cpu().numpy())
         #         plt.show()
 
 
