@@ -214,7 +214,7 @@ class SOLOHead(nn.Module):
         feats_all = torch.sum(torch.cat(feats_all, dim=0), dim=0)
         feats_all = self.all_conv(feats_all)
         human_feats = F.interpolate(human_feats, size=self.human_scale, mode='bilinear', align_corners=True)
-        feats_all=self.non_local(feats_all=feats_all,human_feats=human_feats.deatch())
+        feats_all=self.non_local(feats_all=feats_all,human_feats=human_feats.detach())
         cate_pred, _ = multi_apply(self.forward_single_after, cate_feat,
                                    list(range(len(self.seg_num_grids))),
                                    feats_all=feats_all,

@@ -15,7 +15,7 @@ model=dict(
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
         start_level=0,
-        num_outs=4),#和下面的num_ints=4一起修改
+        num_outs=5),#和下面的num_ints=4一起修改
     ins_head=dict(
         type='SOLOHead',
         num_classes=19,#不算background
@@ -30,6 +30,7 @@ model=dict(
         human_scale=52,
         sigma=0.2,
         num_grids=[40, 36, 24, 16, 12],
+        grid_big=16,
         ins_out_channels=256,
         cate_feat_head=dict(
             type='CateFeatHead',

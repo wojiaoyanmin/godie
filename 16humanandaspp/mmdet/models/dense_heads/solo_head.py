@@ -323,6 +323,7 @@ class SOLOHead(nn.Module):
             gt_mask_list,
             mask_feat_size=mask_feat_size
         )
+        
         human_label=torch.cat(human_label_list)
         human_ind=torch.cat(human_ind_list)
         human_label=human_label[human_ind]
