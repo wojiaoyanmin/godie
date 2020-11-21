@@ -213,6 +213,7 @@ class SOLOHead(nn.Module):
             feats_all.append(feat)
         feats_all = torch.sum(torch.cat(feats_all, dim=0), dim=0)
         feats_all = self.all_conv(feats_all)
+        
         human_feats = F.interpolate(human_feats, size=self.human_scale, mode='bilinear', align_corners=True)
         feats_all=self.non_local(feats_all=feats_all,human_feats=human_feats)
         cate_pred, _ = multi_apply(self.forward_single_after, cate_feat,
@@ -314,6 +315,9 @@ class SOLOHead(nn.Module):
 
         human_pred=human_pred.reshape(-1,mask_feat_size[0]//2,mask_feat_size[1]//2)
         human_pred=human_pred[human_ind]
+        # for i in range(human_pred.shape[0]):
+        #     plt.imshow(human_pred[i].detach().cpu().numpy())
+        #     plt.show()
         loss_human=self.loss_human(human_pred,human_label)
         
         ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list = multi_apply(

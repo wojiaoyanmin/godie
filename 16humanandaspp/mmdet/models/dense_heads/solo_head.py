@@ -78,7 +78,7 @@ class SOLOHead(nn.Module):
         self.conv_cfg=conv_cfg
         self.norm_cfg = norm_cfg
         self.aspp=build_head(aspp)
-
+        assert len(self.seg_num_grids)==len(self.strides)==len(self.seg_num_grids)
         self._init_layers()
 
     def _init_layers(self):
@@ -209,7 +209,7 @@ class SOLOHead(nn.Module):
         plt.imshow(torch.max(showimg[3][0],0)[0].detach().cpu().numpy())
         plt.show()
         '''
-        human_feats,human_pred = self.cate_feat_head(feats)
+        human_feats,human_pred = self.cate_feat_head(feats[:-1])
         human_pred = human_pred.sigmoid()
         feats = self.split_feats(feats)
 
@@ -220,7 +220,7 @@ class SOLOHead(nn.Module):
                                             img_metas=img_metas,
                                             eval=eval, upsampled_size=upsampled_size)
         feats_all = []
-        for conv, feat in zip(self.lateral_convs, cate_feat):
+        for conv, feat in zip(self.lateral_convs[::2], cate_feat[::2]):
             feat = conv(F.interpolate(feat, size=self.human_scale, mode='bilinear', align_corners=True)).unsqueeze(0)
             feats_all.append(feat)
         feats_all = torch.sum(torch.cat(feats_all, dim=0), dim=0)
@@ -228,7 +228,7 @@ class SOLOHead(nn.Module):
         feats_all = self.aspp(feats_all)
         feats_all = self.all_conv(feats_all)
         human_feats = F.interpolate(human_feats, size=self.human_scale, mode='bilinear', align_corners=True)
-        feats_all=self.non_local(feats_all=feats_all,human_feats=human_feats)
+        feats_all=self.non_local(feats_all=feats_all,human_feats=human_feats.detach())
         cate_pred, _ = multi_apply(self.forward_single_after, cate_feat,
                                    list(range(len(self.seg_num_grids))),
                                    feats_all=feats_all,
@@ -241,7 +241,8 @@ class SOLOHead(nn.Module):
         return (F.interpolate(feats[0], scale_factor=0.5, mode='bilinear'),
                 feats[1],
                 feats[2],
-                F.interpolate(feats[3], scale_factor=2, mode='bilinear'))
+                feats[3],
+                F.interpolate(feats[4], scale_factor=2, mode='bilinear'))
 
     def forward_single(self, x, idx,  img_metas=None, eval=False, upsampled_size=None):
         ins_kernel_feat = x
