@@ -50,9 +50,10 @@ class SOLOHead(nn.Module):
                  conv_cfg=None,
                  norm_cfg=None):
         super(SOLOHead, self).__init__()
-        self.sa_list=nn.ModuleList()
-        for i in range(len(num_grids)):
-            self.sa_list.append(build_head(sa))
+        # self.sa_list=nn.ModuleList()
+        # for i in range(len(num_grids)):
+        #     self.sa_list.append(build_head(sa))
+        self.sa = build_head(sa)
         self.non_local=build_head(non_local)
         self.insert_point= insert_point
         self.num_classes = num_classes  # 不算background
@@ -171,8 +172,7 @@ class SOLOHead(nn.Module):
 
     def init_weights(self):
         self.aspp.init_weights()
-        for m in self.sa_list:
-            m.init_weights()
+        self.sa.init_weights()
         self.cate_feat_head.init_weights()
         for m in self.cate_convs:
             normal_init(m.conv, std=0.01)
@@ -221,7 +221,7 @@ class SOLOHead(nn.Module):
                                             img_metas=img_metas,
                                             eval=eval, upsampled_size=upsampled_size)
         feats_all = []
-        for conv, feat in zip(self.lateral_convs[::2], cate_feat[::2]):
+        for conv, feat in zip(self.lateral_convs, cate_feat):
             feat = conv(F.interpolate(feat, size=(featmap_sizes[0][0],featmap_sizes[0][1]), mode='bilinear', align_corners=True)).unsqueeze(0)
             feats_all.append(feat)
         feats_all = torch.sum(torch.cat(feats_all, dim=0), dim=0)
@@ -281,22 +281,9 @@ class SOLOHead(nn.Module):
         seg_num_grid = self.seg_num_grids[idx]
         
         feats_all = F.interpolate(feats_all, size=x.shape[-2:], mode='bilinear', align_corners=True)
-        cate_feat=self.sa_list[idx](x)*feats_all+x
+        cate_feat=self.sa(x)*feats_all+x
         cate_feat = F.interpolate(cate_feat, size=seg_num_grid, mode='bilinear', align_corners=True)
         cate_feat = cate_feat.contiguous()
-
-        # for i in range(feats_all.shape[1]):
-        #     plt.subplot(2,3,1)
-        #     plt.imshow(self.sa_list[idx](x)[0][0].cpu().numpy())
-        #     plt.subplot(2,3,2)
-        #     plt.imshow(feats_all[0][i].cpu().numpy())
-        #     plt.subplot(2,3,3)
-        #     plt.imshow((self.sa_list[idx](x)*feats_all)[0][i].cpu().numpy())
-        #     plt.subplot(2,3,4)
-        #     plt.imshow((x)[0][i].cpu().numpy())
-        #     plt.subplot(2,3,5)
-        #     plt.imshow((self.sa_list[idx](x)*feats_all+x)[0][i].cpu().numpy())
-        #     plt.show()
         
         for i, cate_layer in enumerate(self.cate_convs_after):
             cate_feat = cate_layer(cate_feat)

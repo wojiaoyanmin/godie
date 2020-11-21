@@ -164,7 +164,7 @@ class _NonLocalBlockND(nn.Module):
         #     plt.imshow((W_y+feats_all)[0][i].cpu().numpy())
         #     plt.show()
 
-        return W_y+feats_all
+        return W_y#+feats_all
 
     def minmaxscaler(self,data):
         amax=torch.max(data)
