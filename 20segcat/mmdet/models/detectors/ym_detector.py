@@ -104,9 +104,9 @@ class YMDetector(BaseDetector):
             mask_feat_pred = self.mask_feat_head(
                 x[self.mask_feat_head.
                     start_level:self.mask_feat_head.end_level + 1])
-            loss_inputs = outs + (mask_feat_pred, gt_bboxes, gt_labels, gt_masks,gt_instances, img_metas, self.train_cfg)
+            loss_inputs = outs + (mask_feat_pred, gt_bboxes, gt_labels, gt_masks,gt_instances,gt_semantic_seg, img_metas, self.train_cfg)
         else:
-            loss_inputs = outs + (gt_bboxes, gt_labels,gt_masks,gt_instances,img_metas, self.train_cfg)
+            loss_inputs = outs + (gt_bboxes, gt_labels,gt_masks,gt_instances,gt_semantic_seg,img_metas, self.train_cfg)
         losses = self.ins_head.loss(
             *loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
         return losses

@@ -12,6 +12,7 @@ from mmdet.ops import ConvDW
 import os.path as osp
 import numpy as np
 INF = 1e8
+import cv2
 
 def points_nms(heat, kernel=2):
     # kernel must be 2
@@ -30,8 +31,10 @@ class SOLOHead(nn.Module):
                  stacked_convs=4,
                  cate_stacked_convs=5,
                  cate_stacked_convs_after=2,
+                 seg_stacked_convs=4,
                  ins_feat_channels=512,
                  cate_feat_channels=512,
+                 seg_feat_channels=512,
                  strides=None,
                  scale_ranges=((1, 48), (24, 96), (48, 192), (96, 2048)),
                  grid_big=40,
@@ -47,13 +50,13 @@ class SOLOHead(nn.Module):
                  sa=None,
                  loss_ins=None,
                  loss_cate=None,
+                 loss_seg=None,
                  conv_cfg=None,
                  norm_cfg=None):
         super(SOLOHead, self).__init__()
-        # self.sa_list=nn.ModuleList()
-        # for i in range(len(num_grids)):
-        #     self.sa_list.append(build_head(sa))
-        self.sa = build_head(sa)
+        self.sa_list=nn.ModuleList()
+        for i in range(len(num_grids)):
+            self.sa_list.append(build_head(sa))
         self.non_local=build_head(non_local)
         self.insert_point= insert_point
         self.num_classes = num_classes  # 不算background
@@ -61,8 +64,10 @@ class SOLOHead(nn.Module):
         self.stacked_convs = stacked_convs
         self.cate_stacked_convs =cate_stacked_convs
         self.cate_stacked_convs_after = cate_stacked_convs_after
+        self.seg_stacked_convs = seg_stacked_convs
         self.ins_feat_channels = ins_feat_channels
         self.cate_feat_channels = cate_feat_channels
+        self.seg_feat_channels =seg_feat_channels
         self.strides = strides
         self.scale_ranges = scale_ranges
         self.grid_big = grid_big
@@ -72,10 +77,11 @@ class SOLOHead(nn.Module):
         self.ins_out_channels = ins_out_channels
         self.kernel_out_channels = ins_out_channels*1*1
         self.cate_feat_head = build_head(cate_feat_head)
-        self.aspp=build_head(aspp)
+        
         self.loss_human = build_loss(loss_human)
         self.loss_ins = build_loss(loss_ins)
         self.loss_cate = build_loss(loss_cate)
+        self.loss_seg = build_loss(loss_seg)
         self.conv_cfg=conv_cfg
         self.norm_cfg = norm_cfg
         assert len(self.seg_num_grids)==len(self.strides)==len(self.scale_ranges)
@@ -118,10 +124,9 @@ class SOLOHead(nn.Module):
 
         self.cate_convs_after = nn.ModuleList()
         for i in range(self.cate_stacked_convs_after):
-            chn = self.in_channels if i == 0 else self.cate_feat_channels
             self.cate_convs_after.append(
                 ConvModule(
-                    chn,
+                    self.cate_feat_channels,
                     self.cate_feat_channels,
                     3,
                     stride=1,
@@ -134,8 +139,8 @@ class SOLOHead(nn.Module):
         for i in range(len(self.seg_num_grids)):
             self.lateral_convs.append(
                 ConvModule(
-                    self.in_channels,
-                    self.in_channels,
+                    self.cate_feat_channels,
+                    self.cate_feat_channels,
                     1,
                     stride=1,
                     padding=0,
@@ -144,8 +149,8 @@ class SOLOHead(nn.Module):
                     bias=norm_cfg is None))
 
         self.all_conv = ConvModule(
-                    self.in_channels,
-                    self.in_channels,
+                    self.cate_feat_channels,
+                    self.cate_feat_channels,
                     1,
                     stride=1,
                     padding=0,
@@ -153,16 +158,22 @@ class SOLOHead(nn.Module):
                     act_cfg=None,
                     norm_cfg=norm_cfg,
                     bias=norm_cfg is None)
-        self.all_conv_before = ConvModule(
-                    self.in_channels,
-                    self.in_channels,
-                    1,
-                    stride=1,
-                    padding=0,
-                    conv_cfg=None,
-                    norm_cfg=norm_cfg,
-                    bias=norm_cfg is None)
 
+        self.seg_convs = nn.ModuleList()
+        for i in range(self.seg_stacked_convs):
+            self.seg_convs.append(
+                ConvModule(
+                    self.seg_feat_channels,
+                    self.seg_feat_channels,
+                    3,
+                    stride=1,
+                    padding=1,
+                    conv_cfg=cfg_conv,
+                    norm_cfg=norm_cfg,
+                    bias=norm_cfg is None))
+
+        self.solo_seg=nn.Conv2d(
+            self.seg_feat_channels, self.num_classes , 3 , padding=1) 
 
         self.solo_cate = nn.Conv2d(
             self.cate_feat_channels, self.num_classes, 3, padding=1)
@@ -171,10 +182,12 @@ class SOLOHead(nn.Module):
             self.ins_feat_channels, self.kernel_out_channels, 3, padding=1)
 
     def init_weights(self):
-        self.aspp.init_weights()
-        self.sa.init_weights()
+        for m in self.sa_list:
+            m.init_weights()
         self.cate_feat_head.init_weights()
         for m in self.cate_convs:
+            normal_init(m.conv, std=0.01)
+        for m in self.seg_convs:
             normal_init(m.conv, std=0.01)
         for m in self.cate_convs_after:
             normal_init(m.conv, std=0.01)
@@ -183,10 +196,10 @@ class SOLOHead(nn.Module):
         for m in self.kernel_convs:
             normal_init(m.conv, std=0.01)
         bias_cate = bias_init_with_prob(0.01)
+        normal_init(self.solo_seg, std=0.01, bias=bias_cate)
         normal_init(self.solo_cate, std=0.01, bias=bias_cate)
         normal_init(self.solo_kernel, std=0.01)
         normal_init(self.all_conv.conv, std=0.01)
-        normal_init(self.all_conv_before.conv, std=0.01)
 
     def forward(self, feats,img_metas=None, eval=False):
         '''
@@ -210,7 +223,7 @@ class SOLOHead(nn.Module):
         plt.imshow(torch.max(showimg[3][0],0)[0].detach().cpu().numpy())
         plt.show()
         '''
-        human_feats,human_pred = self.cate_feat_head(feats)
+        human_feats,human_pred = self.cate_feat_head(feats[:-1])
         human_pred = human_pred.sigmoid()
         feats = self.split_feats(feats)
 
@@ -225,17 +238,19 @@ class SOLOHead(nn.Module):
             feat = conv(F.interpolate(feat, size=(featmap_sizes[0][0],featmap_sizes[0][1]), mode='bilinear', align_corners=True)).unsqueeze(0)
             feats_all.append(feat)
         feats_all = torch.sum(torch.cat(feats_all, dim=0), dim=0)
-        # feats_all = self.all_conv_before(feats_all)
-        # feats_all = self.aspp(feats_all)
         feats_all = self.all_conv(feats_all)
         feats_all=self.non_local(feats_all=feats_all,human_feats=human_feats)
+        for conv in self.seg_convs:
+            feats_all=conv(feats_all)
+        
         cate_pred, _ = multi_apply(self.forward_single_after, cate_feat,
                                    list(range(len(self.seg_num_grids))),
                                    feats_all=feats_all,
                                    img_metas=img_metas,
                                    eval=eval, upsampled_size=upsampled_size)
-
-        return cate_pred, kernel_pred, human_pred
+        feats_all = F.interpolate(feats_all, scale_factor=2, mode='bilinear')
+        seg_pred = self.solo_seg(feats_all)
+        return cate_pred, kernel_pred, human_pred, seg_pred
 
     def split_feats(self, feats):
         return (F.interpolate(feats[0], scale_factor=0.5, mode='bilinear'),
@@ -246,7 +261,6 @@ class SOLOHead(nn.Module):
 
     def forward_single(self, x, idx,  img_metas=None, eval=False, upsampled_size=None):
         ins_kernel_feat = x
-        cate_feat = x
         # ins branch
         # concat coord
         x_range = torch.linspace(-1, 1, ins_kernel_feat.shape[-1], device=ins_kernel_feat.device)
@@ -262,43 +276,32 @@ class SOLOHead(nn.Module):
         seg_num_grid = self.seg_num_grids[idx]
         kernel_feat = F.interpolate(kernel_feat, size=seg_num_grid, mode='bilinear', align_corners=True)
 
-        
+        cate_feat = ins_kernel_feat[:, :-2, :, :]
+
         kernel_feat = kernel_feat.contiguous()
         for i, kernel_layer in enumerate(self.kernel_convs):
             kernel_feat = kernel_layer(kernel_feat)
         kernel_pred = self.solo_kernel(kernel_feat)
 
         # cate branch
-        # cate_feat = cate_feat.contiguous()
-        # cate_feat = F.interpolate(cate_feat, size=seg_num_grid, mode='bilinear', align_corners=True)
-        # for i, cate_layer in enumerate(self.cate_convs):
-        #     cate_feat = cate_layer(cate_feat)
+        cate_feat = cate_feat.contiguous()
+        cate_feat = F.interpolate(cate_feat, size=seg_num_grid, mode='bilinear', align_corners=True)
+        for i, cate_layer in enumerate(self.cate_convs):
+            cate_feat = cate_layer(cate_feat)
 
         return cate_feat, kernel_pred
 
     def forward_single_after(self, x, idx, feats_all=None,img_metas=None, eval=False, upsampled_size=None):
         seg_num_grid = self.seg_num_grids[idx]
         
-        feats_all = F.interpolate(feats_all, size=x.shape[-2:], mode='bilinear', align_corners=True)
-        cate_feat=self.sa(x)*feats_all+x
-        cate_feat = F.interpolate(cate_feat, size=seg_num_grid, mode='bilinear', align_corners=True)
-        cate_feat = cate_feat.contiguous()
-
-        # for i in range(feats_all.shape[1]):
-        #     plt.subplot(2,3,1)
-        #     plt.imshow(torch.max(x[0],dim=0)[0].cpu().numpy())
-        #     plt.subplot(2,3,2)
-        #     plt.imshow(feats_all[0][i].cpu().numpy())
-        #     plt.subplot(2,3,3)
-        #     plt.imshow((torch.max(x[0],dim=0)[0]*feats_all)[0][i].cpu().numpy())
-        #     plt.subplot(2,3,4)
-        #     plt.imshow((x)[0][i].cpu().numpy())
-        #     plt.subplot(2,3,5)
-        #     plt.imshow((torch.max(x[0],dim=0)[0]*feats_all+x)[0][i].cpu().numpy())
-        #     plt.show()
+        
+        cate_feat = F.interpolate(x, size=seg_num_grid, mode='bilinear', align_corners=True).contiguous()
+        feats_all = F.interpolate(feats_all, size=seg_num_grid, mode='bilinear', align_corners=True).contiguous()
         
         for i, cate_layer in enumerate(self.cate_convs_after):
             cate_feat = cate_layer(cate_feat)
+            if i == self.insert_point:
+                cate_feat=self.sa_list[idx](cate_feat)*feats_all+cate_feat
         cate_pred = self.solo_cate(cate_feat)
 
         if eval:
@@ -309,11 +312,13 @@ class SOLOHead(nn.Module):
              cate_preds,
              kernel_preds,
              human_pred,
+             seg_pred,
              ins_pred,
              gt_bbox_list,
              gt_label_list,
              gt_mask_list,
              gt_instance_list,
+             gt_semantic_seg_list,
              img_metas,
              cfg,
              gt_bboxes_ignore=None):
@@ -337,12 +342,14 @@ class SOLOHead(nn.Module):
         #     plt.show()
         loss_human=self.loss_human(human_pred,human_label)
         
-        ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list = multi_apply(
+        semantic_label_list,ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list = multi_apply(
             self.solov2_target_single,
             gt_bbox_list,
             gt_label_list,
             gt_mask_list,
+            gt_semantic_seg_list,
             mask_feat_size=mask_feat_size)
+        
         # ins
         ins_labels = [torch.cat([ins_labels_level_img
                                  for ins_labels_level_img in ins_labels_level], 0)
@@ -411,7 +418,16 @@ class SOLOHead(nn.Module):
             1.0328,1.0328,1.0184,1.0186]).expand(flatten_cate_preds.shape).to(flatten_cate_preds.device)'''
         loss_cate = self.loss_cate(flatten_cate_preds, flatten_cate_labels, avg_factor=num_ins + 1)
         
+        #loss seg
+        seg_labels = torch.cat([
+            semantic_label_img.flatten()
+                       for semantic_label_img  in semantic_label_list
+        ])
+        seg_pred =  seg_pred.permute(0, 2, 3, 1).reshape(-1, self.num_classes)
+        loss_seg = self.loss_seg(seg_pred,seg_labels,avg_factor=(seg_labels!=self.num_classes).sum()+1)
+
         return dict(
+            loss_seg=loss_seg,
             loss_ins=loss_ins,
             loss_cate=loss_cate,
             loss_human=loss_human)
@@ -475,6 +491,7 @@ class SOLOHead(nn.Module):
                                gt_bboxes_raw,
                                gt_labels_raw,
                                gt_masks_raw,
+                               gt_semantic_raw,
                                mask_feat_size):
 
         device = gt_labels_raw[0].device
@@ -482,7 +499,6 @@ class SOLOHead(nn.Module):
         # ins
         gt_areas = torch.sqrt((gt_bboxes_raw[:, 2] - gt_bboxes_raw[:, 0]) * (
                 gt_bboxes_raw[:, 3] - gt_bboxes_raw[:, 1]))
-
         ins_label_list = []
         cate_label_list = []
         ins_ind_label_list = []
@@ -552,10 +568,21 @@ class SOLOHead(nn.Module):
             cate_label_list.append(cate_label)
             ins_ind_label_list.append(ins_ind_label)
             grid_order_list.append(grid_order)
-            
-        return ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list
+            #semantic
+        
+        gt_semantic_raw = gt_semantic_raw[0].cpu().numpy()
+        gt_semantic_raw=cv2.resize(gt_semantic_raw,(mask_feat_size[1],mask_feat_size[0]),interpolation=cv2.INTER_NEAREST)
+        gt_semantic_raw_seg=gt_semantic_raw
+        gt_semantic_raw_edge=gt_semantic_raw
+        #semantic
+        
+        #gt_semantic_raw_edge=cv2.resize(gt_semantic_raw_edge,(mask_feat_size[1],mask_feat_size[0]),interpolation=cv2.INTER_NEAREST)
+        gt_semantic=torch.from_numpy(gt_semantic_raw_seg).to(device).unsqueeze(0).long()
+        gt_semantic=(gt_semantic-1)
+        gt_semantic[(gt_semantic>self.num_classes)|(gt_semantic<0)]=self.num_classes
+        return gt_semantic, ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list
 
-    def get_seg(self, cate_preds, kernel_preds, human_preds, seg_pred, img_metas, cfg, rescale=None):
+    def get_seg(self, cate_preds, kernel_preds, human_preds,seg_preds_sem, seg_pred, img_metas, cfg, rescale=None):
         num_levels = len(cate_preds)
         featmap_size = seg_pred.size()[-2:]
 

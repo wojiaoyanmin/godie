@@ -79,20 +79,15 @@ class _NonLocalBlockND(nn.Module):
             nn.init.constant_(self.W.weight, 0)
             nn.init.constant_(self.W.bias, 0)
 
+        self.conv_fuse = conv_nd(in_channels=self.in_channels*2, out_channels=self.in_channels,
+                             kernel_size=1, stride=1, padding=0)
         self.theta = conv_nd(in_channels=self.in_channels, out_channels=self.inter_channels,
                              kernel_size=1, stride=1, padding=0)
         self.phi = conv_nd(in_channels=self.in_channels, out_channels=self.inter_channels,
                            kernel_size=1, stride=1, padding=0)
-        self.sum_after = conv_nd(in_channels=self.in_channels, out_channels=self.in_channels,
-                           kernel_size=1, stride=1, padding=0)
-        self.human_theta = conv_nd(in_channels=self.in_channels, out_channels=self.inter_channels,
-                             kernel_size=1, stride=1, padding=0)
-        self.human_phi = conv_nd(in_channels=self.in_channels, out_channels=self.inter_channels,
-                             kernel_size=1, stride=1, padding=0)
         if sub_sample:
             self.g = nn.Sequential(self.g, max_pool_layer)
             self.phi = nn.Sequential(self.phi, max_pool_layer)
-            self.human_phi = nn.Sequential(self.human_phi, max_pool_layer)
 
     def forward(self, feats_all=None,human_feats=None):
         '''
@@ -100,17 +95,11 @@ class _NonLocalBlockND(nn.Module):
         :return:
         '''
 
-        query = feats_all
+        query = torch.cat([feats_all,human_feats],dim=1)
+        query =self.conv_fuse(query)
         key = feats_all
         value = feats_all
         batch_size = feats_all.size(0)
-        human_query = self.human_theta(human_feats).view(batch_size, self.inter_channels, -1).permute(0, 2, 1)
-        human_key =self.human_phi(human_feats).view(batch_size, self.inter_channels, -1)
-        human_map = torch.matmul(human_query, human_key)
-        
-        human_map = (self.inter_channels ** -.5) * human_map   
-
-        human_map = F.softmax(human_map, dim=-1)
         # human_map=human_map.reshape(40,40,40,40)
         # for i in range(0,40,6):
         #     for j in range(0,40,6):
@@ -148,7 +137,7 @@ class _NonLocalBlockND(nn.Module):
         #         plt.show()
 
 
-        f_div_C = (human_map+f)/2
+        f_div_C = f
 
         y = torch.matmul(f_div_C, g_x)
         y = y.permute(0, 2, 1).contiguous()
@@ -164,7 +153,7 @@ class _NonLocalBlockND(nn.Module):
         #     plt.imshow((W_y+feats_all)[0][i].cpu().numpy())
         #     plt.show()
 
-        return W_y
+        return W_y+feats_all
 
     def minmaxscaler(self,data):
         amax=torch.max(data)
