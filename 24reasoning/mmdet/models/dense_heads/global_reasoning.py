@@ -58,7 +58,6 @@ class GloRe_Unit(nn.Module):
                  BatchNormNd=nn.BatchNorm3d,
                  normalize=False):
         super(GloRe_Unit, self).__init__()
-        self.sa=SpatialAttention()
         self.normalize = normalize
         self.num_s = int(2 * num_mid)
         self.num_n = int(1 * num_mid)
@@ -79,18 +78,18 @@ class GloRe_Unit(nn.Module):
         self.sum_after = ConvNd(in_channels=num_in, out_channels=num_in,
                            kernel_size=1, stride=1, padding=0)
 
-    def forward(self, x, feats_all=None,human_feats=None):
+    def forward(self, feats_all=None,human_feats=None):
         '''
         :param x: (n, c, d, h, w)
 
         '''
         feat = self.sum_after(feats_all+human_feats)
 
-        n = x.size(0)
+        n = feats_all.size(0)
 
         # (n, num_in, h, w) --> (n, num_state, h, w)
         #                   --> (n, num_state, h*w)
-        x_state_reshaped = self.conv_state(feat_all).view(n, self.num_s, -1)
+        x_state_reshaped = self.conv_state(feats_all).view(n, self.num_s, -1)
 
         # (n, num_in, h, w) --> (n, num_node, h, w)
         #                   --> (n, num_node, h*w)
@@ -118,11 +117,11 @@ class GloRe_Unit(nn.Module):
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
         # (n, num_state, h*w) --> (n, num_state, h, w)
-        x_state = x_state_reshaped.view(n, self.num_s, *x.size()[2:])
+        x_state = x_state_reshaped.view(n, self.num_s, *feats_all.size()[2:])
 
         # -----------------
         # (n, num_state, h, w) -> (n, num_in, h, w)
-        out = self.sa(x)*self.blocker(self.conv_extend(x_state))+x
+        out = self.blocker(self.conv_extend(x_state))+feats_all
 
         return out
 

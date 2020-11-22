@@ -54,7 +54,6 @@ class SOLOHead(nn.Module):
         for i in range(len(num_grids)):
             self.sa_list.append(build_head(sa))
         self.reasoning=build_head(reasoning)
-        self.insert_point= insert_point
         self.num_classes = num_classes  # 不算background
         self.in_channels = in_channels
         self.stacked_convs = stacked_convs
@@ -63,7 +62,6 @@ class SOLOHead(nn.Module):
         self.seg_stacked_convs = seg_stacked_convs
         self.ins_feat_channels = ins_feat_channels
         self.cate_feat_channels = cate_feat_channels
-        self.seg_feat_channels =seg_feat_channels
         self.strides = strides
         self.scale_ranges = scale_ranges
         self.grid_big = grid_big
