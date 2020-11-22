@@ -109,7 +109,6 @@ class SOLOHead(nn.Module):
 
         for i in range(self.cate_stacked_convs):
             chn = self.in_channels if i == 0 else self.cate_feat_channels
-            act_cfg=None if i== self.cate_stacked_convs-1 else dict(type='ReLU')
             self.cate_convs.append(
                 ConvModule(
                     chn,
@@ -119,7 +118,6 @@ class SOLOHead(nn.Module):
                     padding=1,
                     conv_cfg=cfg_conv,
                     norm_cfg=norm_cfg,
-                    act_cfg =act_cfg,
                     bias=norm_cfg is None))
 
         self.cate_convs_after = nn.ModuleList()
@@ -261,6 +259,7 @@ class SOLOHead(nn.Module):
 
     def forward_single(self, x, idx,  img_metas=None, eval=False, upsampled_size=None):
         ins_kernel_feat = x
+        cate_feat=x
         # ins branch
         # concat coord
         x_range = torch.linspace(-1, 1, ins_kernel_feat.shape[-1], device=ins_kernel_feat.device)
@@ -276,7 +275,6 @@ class SOLOHead(nn.Module):
         seg_num_grid = self.seg_num_grids[idx]
         kernel_feat = F.interpolate(kernel_feat, size=seg_num_grid, mode='bilinear', align_corners=True)
 
-        cate_feat = ins_kernel_feat[:, :-2, :, :]
 
         kernel_feat = kernel_feat.contiguous()
         for i, kernel_layer in enumerate(self.kernel_convs):
@@ -285,7 +283,6 @@ class SOLOHead(nn.Module):
 
         # cate branch
         cate_feat = cate_feat.contiguous()
-        cate_feat = F.interpolate(cate_feat, size=seg_num_grid, mode='bilinear', align_corners=True)
         for i, cate_layer in enumerate(self.cate_convs):
             cate_feat = cate_layer(cate_feat)
 
