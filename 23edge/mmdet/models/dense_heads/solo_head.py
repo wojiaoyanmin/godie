@@ -521,7 +521,7 @@ class SOLOHead(nn.Module):
             
         return ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list
 
-    def get_seg(self, cate_preds, kernel_preds, human_preds, edge_preds, seg_pred, img_metas, cfg, rescale=None):
+    def get_seg(self, cate_preds, kernel_preds, edge_preds, seg_pred, img_metas, cfg, rescale=None):
         num_levels = len(cate_preds)
         featmap_size = seg_pred.size()[-2:]
 
