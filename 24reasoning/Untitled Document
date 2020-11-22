@@ -1,3 +1,5 @@
-全部都用feats_all和human的结合
-global reasoning 
-最后用一个saptial attention撑起来再加上
+human threshold
+在1的基础之上调relu conv的数量等
+human he feats all加在一起
+在15的基础之上  改成了feats all只选择其中一部分
+ 然后 detach()

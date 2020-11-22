@@ -90,7 +90,7 @@ class GloRe_Unit(nn.Module):
 
         # (n, num_in, h, w) --> (n, num_state, h, w)
         #                   --> (n, num_state, h*w)
-        x_state_reshaped = self.conv_state(feats_all).view(n, self.num_s, -1)
+        x_state_reshaped = self.conv_state(feat_all).view(n, self.num_s, -1)
 
         # (n, num_in, h, w) --> (n, num_node, h, w)
         #                   --> (n, num_node, h*w)
@@ -122,9 +122,9 @@ class GloRe_Unit(nn.Module):
 
         # -----------------
         # (n, num_state, h, w) -> (n, num_in, h, w)
-        out = self.sa(x)*self.blocker(self.conv_extend(x_state))
+        out = self.sa(x)*self.blocker(self.conv_extend(x_state))+x
 
-        return out+x
+        return out
 
 @HEADS.register_module
 class GloRe_Unit_1D(GloRe_Unit):
