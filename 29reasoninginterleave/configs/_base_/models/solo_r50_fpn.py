@@ -38,12 +38,13 @@ model=dict(
             out_channels=512,
             start_level=0,
             end_level=3,
-            num_classes=16*16,
+            num_classes=8*8,
             norm_cfg=dict(type='GN', num_groups=32, requires_grad=True),
             num_grid=64,
             stack_convs=2),
         reasoning=dict(
             type='GloRe_Unit_2D',
+            num_human=8**2,
             num_in=512,
             num_mid=16),
         sa=dict(

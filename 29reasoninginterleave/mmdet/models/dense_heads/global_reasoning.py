@@ -62,11 +62,11 @@ class GloRe_Unit(nn.Module):
         self.num_human = num_human
         self.num_s = int(2 * num_mid)
         self.num_n = int(1 * num_mid)
-
+        self.down_channels=ConvNd(num_in, self.num_s*2, kernel_size=1)
         # reduce dim
-        self.conv_state = ConvNd(num_in, self.num_s, kernel_size=1)
+        self.conv_state = ConvNd(self.num_s*2, self.num_s, kernel_size=1)
         # projection map
-        self.conv_proj = ConvNd(num_in, self.num_n, kernel_size=1)
+        self.conv_proj = ConvNd(self.num_s*2, self.num_n, kernel_size=1)
 
 
         # ----------
@@ -74,8 +74,8 @@ class GloRe_Unit(nn.Module):
         self.gcn = GCN(num_state=self.num_s, num_node=self.num_n)
         # ----------
         # extend dimension
-        self.conv_extend = ConvNd(self.num_s, num_in//16, kernel_size=1)
-        self.recover = ConvNd(num_in // 16 *num_human, num_in, kernel_size=1, bias=False)
+        self.conv_extend = ConvNd(self.num_s, self.num_s, kernel_size=1)
+        self.recover = ConvNd(self.num_s *num_human, num_in, kernel_size=1, bias=False)
 
         self.blocker = BatchNormNd(num_in, eps=1e-04)  # should be zero initialized
 
@@ -86,20 +86,22 @@ class GloRe_Unit(nn.Module):
 
         '''
         batchsize,channels,h,w =feats_all.shape
+        feat =self.down_channels(feats_all)
         human_pred=human_pred.unsqueeze(2)
-        feat=feats_all.unsuqeeze(1)
-        feat=feat*human_pred
-        feat=feat.reshape(batchsize*self.num_human,channels,h,w)
 
-        n = feats_all.size(0)
+        feat=feat.unsqueeze(1)
+        feat=feat*human_pred
+        
+        feat=feat.reshape(batchsize*self.num_human,self.num_s*2,h,w)
 
         # (n, num_in, h, w) --> (n, num_state, h, w)
         #                   --> (n, num_state, h*w)
-        x_state_reshaped = self.conv_state(feat).view(n, self.num_s, -1)
+
+        x_state_reshaped = self.conv_state(feat).view(batchsize*self.num_human, self.num_s, -1)
 
         # (n, num_in, h, w) --> (n, num_node, h, w)
         #                   --> (n, num_node, h*w)
-        x_proj_reshaped = self.conv_proj(feat).view(n, self.num_n, -1)
+        x_proj_reshaped = self.conv_proj(feat).view(batchsize*self.num_human, self.num_n, -1)
 
         # (n, num_in, h, w) --> (n, num_node, h, w)
         #                   --> (n, num_node, h*w)
@@ -119,15 +121,13 @@ class GloRe_Unit(nn.Module):
         # reverse projection: interaction space -> coordinate space
         # (n, num_state, num_node) x (n, num_node, h*w) --> (n, num_state, h*w)
         x_state_reshaped = torch.matmul(x_n_rel, x_rproj_reshaped)
-
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
         # (n, num_state, h*w) --> (n, num_state, h, w)
-        x_state = x_state_reshaped.view(n, self.num_s, *feats_all.size()[2:])
+        x_state = x_state_reshaped.view(batchsize*self.num_human, self.num_s, *feat.size()[2:])
 
         # -----------------
         # (n, num_state, h, w) -> (n, num_in, h, w)
-        x_state = self.conv_extend(x_state)
         x_state = x_state.reshape(batchsize,-1,h,w)
         x_state = self.recover(x_state)
         out = self.blocker(x_state)+feats_all

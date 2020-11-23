@@ -301,9 +301,11 @@ class SOLOHead(nn.Module):
 
         human_pred=human_pred.reshape(-1,mask_feat_size[0]//2,mask_feat_size[1]//2)
         human_pred=human_pred[human_ind]
-        # for i in range(human_pred.shape[0]):
-        #     plt.imshow(human_pred[i].detach().cpu().numpy())
+        # print(img_metas)
+        # for i in range(human_label.shape[0]):
+        #     plt.imshow(human_label[i].detach().cpu().numpy())
         #     plt.show()
+
         loss_human=self.loss_human(human_pred,human_label)
         
         semantic_label_list,ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list = multi_apply(
@@ -427,29 +429,28 @@ class SOLOHead(nn.Module):
 
             upsampled_size = (mask_feat_size[0] * 4, mask_feat_size[1] * 4)
             center_h, center_w = ndimage.measurements.center_of_mass(gt_masks)
-            coord_w = torch.round((center_w / upsampled_size[1]) // (1. / self.grid_big))
-            coord_h = torch.round((center_h / upsampled_size[0]) // (1. / self.grid_big))
+            coord_w = int((center_w / upsampled_size[1]) // (1. / self.grid_big))
+            coord_h = int((center_h / upsampled_size[0]) // (1. / self.grid_big))
 
-            # # left, top, right, down
-            # top_box = max(0, int(((center_h - half_h) / upsampled_size[0]) // (1. / self.grid_big)))
-            # down_box = min(self.grid_big - 1, int(((center_h + half_h) / upsampled_size[0]) // (1. / self.grid_big)))
-            # left_box = max(0, int(((center_w - half_w) / upsampled_size[1]) // (1. / self.grid_big)))
-            # right_box = min(self.grid_big - 1, int(((center_w + half_w) / upsampled_size[1]) // (1. / self.grid_big)))
-            #
-            # top = max(top_box, coord_h - 1)
-            # down = min(down_box, coord_h + 1)
-            # left = max(coord_w - 1, left_box)
-            # right = min(right_box, coord_w + 1)
-            coord_w = min(self.grid_big,max(0,coord_w))
-            coord_h = min(self.grid_big,max(0,coord_h))
+            # left, top, right, down
+            top_box = max(0, int(((center_h - half_h) / upsampled_size[0]) // (1. / self.grid_big)))
+            down_box = min(self.grid_big - 1, int(((center_h + half_h) / upsampled_size[0]) // (1. / self.grid_big)))
+            left_box = max(0, int(((center_w - half_w) / upsampled_size[1]) // (1. / self.grid_big)))
+            right_box = min(self.grid_big - 1, int(((center_w + half_w) / upsampled_size[1]) // (1. / self.grid_big)))
 
+            top = max(top_box, coord_h - 1)
+            down = min(down_box, coord_h + 1)
+            left = max(coord_w - 1, left_box)
+            right = min(right_box, coord_w + 1)
 
             output_stride = 8
             gt_masks = mmcv.imrescale(gt_masks, scale=1. / output_stride)
             gt_masks = torch.Tensor(gt_masks)
-            label = int(coord_h * self.grid_big + coord_w)
-            human_ind[label] = 1
-            human_label[label, :gt_masks.shape[0], :gt_masks.shape[1]] = gt_masks
+            for i in range(top, down + 1):
+                for j in range(left, right + 1):
+                    label = int(i * self.grid_big + j)
+                    human_ind[label] = 1
+                    human_label[label, :gt_masks.shape[0], :gt_masks.shape[1]] = gt_masks
         return human_label, human_ind
 
     def solov2_target_single(self,
