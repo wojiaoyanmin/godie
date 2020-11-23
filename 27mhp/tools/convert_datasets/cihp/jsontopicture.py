@@ -4,12 +4,11 @@ from pycocotools.coco import COCO
 from skimage import io
 from matplotlib import pyplot as plt
 import matplotlib
-
 matplotlib.use('TkAgg')
 import cv2
 import time
-import mmcv
 import pdb
+import mmcv
 
 
 def jsontopicture(json_file, dataset_dir, out_dir):
@@ -50,9 +49,9 @@ def jsontopicture(json_file, dataset_dir, out_dir):
 
 
 def main():
-    json_file='data/CIHP/annotations/Instance_try.json'
+    json_file='data/MHP/annotations/Instance_val.json'
     #json_file = 'data/CIHP/annotations/Instance_val.json'
-    dataset_dir = 'data/CIHP/val/'
+    dataset_dir = 'data/MHP/val/'
     out_dir = 'work_dirs/gtjsonvis/'
     mmcv.mkdir_or_exist(out_dir)
     jsontopicture(json_file, dataset_dir, out_dir)

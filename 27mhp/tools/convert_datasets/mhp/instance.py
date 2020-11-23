@@ -68,17 +68,21 @@ mhp_id2label={  0: 'Background',
 
 def collect_files(Images_dir, Instance_dir ):
     files = []
-    suffix='jpg'
+    print("collencting files")
+    suffix='.jpg'
+    ii=0
     for Image_file in glob.glob(osp.join(Images_dir, '*.jpg')):
         file_single=[]
         file_single.append(Image_file)
         image_index=osp.basename(Image_file)[:-len(suffix)]
-        for instance_file in glob.glob(osp.join(Instance_dir, '*.jpg')):
+        for instance_file in glob.glob(osp.join(Instance_dir, '*.png')):
             instance_name=osp.basename(instance_file)[:-len(suffix)]
             instance_index,totoal_num,human_index=instance_name.split('_')
             if instance_index==image_index:
                 file_single.append(instance_file)
         files.append(file_single)
+        ii=ii+1
+        print('collect ',ii,' image successfully')
     assert len(files), f'No images found in {Images_dir}'
     print(f'Loaded {len(files)} images from {Images_dir}')
     return files
@@ -100,19 +104,24 @@ def load_img_info(files):
     Instance_files = files[1:]
     anno_info = []
     for Instance_file in Instance_files:
-        Instance_img = mmcv.imread(Instance_file, 'unchanged')
+
+        Instance_img = mmcv.imread(Instance_file, 'unchanged')[:,:,2]
         category_ids = np.unique(Instance_img)
         for category_id in category_ids:
-            if id == 0:
+
+            if category_id==255:
+                continue
+            if category_id == 0:
                 continue
             iscrowd = 0
-            mask = np.asarray(Instance_img == id, dtype=np.uint8, order='F')
+            mask = np.asarray(Instance_img == category_id, dtype=np.uint8, order='F')
             mask_rle = maskUtils.encode(mask[:, :, None])[0]
             area = maskUtils.area(mask_rle)
             # convert to COCO style XYWH format
             bbox = maskUtils.toBbox(mask_rle)
             # for json encoding
             mask_rle['counts'] = mask_rle['counts'].decode()
+            category_id=int(category_id)
             anno = dict(
                 iscrowd=iscrowd,
                 category_id=category_id,
@@ -155,18 +164,19 @@ def cvt_annotations(infos, out_json_name):
 
     if len(out_json['annotations']) == 0:
         out_json.pop('annotations')
+
     mmcv.dump(out_json, out_json_name)
     return out_json
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Convert cihp annotations to COCO format')
-    parser.add_argument('cihp_path', help='cihp data path')
-    parser.add_argument('--Images', default='Images', type=str)
+        description='Convert mhp annotations to COCO format')
+    parser.add_argument('mhp_path', help='mhp data path')
+    parser.add_argument('--Images', default='images', type=str)
     parser.add_argument('--Categoriy-dir', default='Category_ids', type=str)
     parser.add_argument('--Human-dir', default='Human_ids', type=str)
-    parser.add_argument('--Instance-dir', default='Instance_ids', type=str)
+    parser.add_argument('--Instance-dir', default='parsing_annos', type=str)
     parser.add_argument('-o', '--out-dir', help='output path')
     parser.add_argument(
         '--nproc', default=1, type=int, help='number of process')
@@ -176,8 +186,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    cihp_path = args.cihp_path
-    out_dir = args.out_dir if args.out_dir else cihp_path
+    mhp_path = args.mhp_path
+    out_dir = args.out_dir if args.out_dir else mhp_path
     mmcv.mkdir_or_exist(out_dir)
 
 
@@ -190,10 +200,10 @@ def main():
     for split, json_name in set_name.items():
         print(f'Converting {split} into {json_name}')
         with mmcv.Timer(
-                print_tmpl='It tooks {}s to convert Cityscapes annotation'):
+                print_tmpl='It tooks {}s to convert MHP annotation'):
             files = collect_files(
-                osp.join(cihp_path, split, args.Images),
-                osp.join(cihp_path, split, args.Instance_dir))
+                osp.join(mhp_path, split, args.Images),
+                osp.join(mhp_path, split, args.Instance_dir))
             infos = collect_annotations(files, nproc=args.nproc)
             cvt_annotations(infos, osp.join(out_dir, json_name))
 
