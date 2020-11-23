@@ -20,7 +20,7 @@ import warnings
 
 @DATASETS.register_module()
 class MHPDataset(CocoDataset):
-    CLASSES = ('Background',
+    CLASSES = (
                 'Cap/hat',
                 'Helmet',
                  'Face',
@@ -315,19 +315,19 @@ class MHPDataset(CocoDataset):
             eval_results.update(
                 self_coco.evaluate(result_ins, metrics, logger, outfile_prefix,
                                    classwise, proposal_nums, iou_thrs))
-            head = osp.basename(self.ann_file).replace('Instance', 'Categories')
-            semantic_ann_file = osp.join(osp.dirname(self.ann_file), head)
-            result_sem = [result[:][1] for result in results]
-            sem_coco = CocoDataset(semantic_ann_file, self.pipeline.transforms,
-                                   None, self.data_root, self.img_prefix,
-                                   self.seg_prefix, self.proposal_file,
-                                   self.test_mode, self.filter_empty_gt)
-            sem_coco.CLASSES = self.CLASSES
-            sem_coco.data_infos = sem_coco.load_annotations(semantic_ann_file)
-            infos = []
-            for i in range(len(sem_coco)):
-                infos.append(sem_coco.get_ann_info(i))
-            eval_results.update(self.evaluatesem(result_sem, infos, logger, len(self.CLASSES)))  # 19
+            # head = osp.basename(self.ann_file).replace('Instance', 'Categories')
+            # semantic_ann_file = osp.join(osp.dirname(self.ann_file), head)
+            # result_sem = [result[:][1] for result in results]
+            # sem_coco = CocoDataset(semantic_ann_file, self.pipeline.transforms,
+            #                        None, self.data_root, self.img_prefix,
+            #                        self.seg_prefix, self.proposal_file,
+            #                        self.test_mode, self.filter_empty_gt)
+            # sem_coco.CLASSES = self.CLASSES
+            # sem_coco.data_infos = sem_coco.load_annotations(semantic_ann_file)
+            # infos = []
+            # for i in range(len(sem_coco)):
+            #     infos.append(sem_coco.get_ann_info(i))
+            # eval_results.update(self.evaluatesem(result_sem, infos, logger, len(self.CLASSES)))  # 19
         return eval_results
 
     def get_confusion_matrix(self, gt_label, pred_label, class_num):

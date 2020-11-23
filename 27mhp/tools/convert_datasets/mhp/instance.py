@@ -103,10 +103,17 @@ def load_img_info(files):
     Image_file= files[0]
     Instance_files = files[1:]
     anno_info = []
+    suffix='.jpg'
     for Instance_file in Instance_files:
 
+        Instance_name=osp.basename(Instance_file)[:-len(suffix)]
+        instance_index,totoal_num,human_index=Instance_name.split('_')
         Instance_img = mmcv.imread(Instance_file, 'unchanged')[:,:,2]
         category_ids = np.unique(Instance_img)
+        instance_id=int(human_index)-1
+        if instance_id<0:
+            print(Instance_file)
+            print(instance_id<0)
         for category_id in category_ids:
 
             if category_id==255:
@@ -114,6 +121,10 @@ def load_img_info(files):
             if category_id == 0:
                 continue
             iscrowd = 0
+            
+            if category_id<0:
+                print(Instance_file)
+                print(category_id<0)
             mask = np.asarray(Instance_img == category_id, dtype=np.uint8, order='F')
             mask_rle = maskUtils.encode(mask[:, :, None])[0]
             area = maskUtils.area(mask_rle)
@@ -121,10 +132,11 @@ def load_img_info(files):
             bbox = maskUtils.toBbox(mask_rle)
             # for json encoding
             mask_rle['counts'] = mask_rle['counts'].decode()
-            category_id=int(category_id)
+            category_id=int(category_id)-1
             anno = dict(
                 iscrowd=iscrowd,
                 category_id=category_id,
+                instance_id=instance_id,
                 bbox=bbox.tolist(),
                 area=area.tolist(),
                 segmentation=mask_rle)
@@ -135,7 +147,8 @@ def load_img_info(files):
             file_name=osp.join(video_name, osp.basename(Image_file)),
             height=Instance_img.shape[0],
             width=Instance_img.shape[1],
-            anno_info=anno_info)
+            anno_info=anno_info,
+            segm_file=None)
     return info
 
 def cvt_annotations(infos, out_json_name):

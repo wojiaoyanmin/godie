@@ -163,3 +163,5 @@ tensorboard --logdir=tf_logs
 ./tools/dist_train.sh configs/solo/solo_hrnet_w32_1x_CIHP.py 2
 
 ./tools/dist_test.sh configs/solo/solo_hrnet_w32_1x_CIHP.py work_dirs/solo_hrnet_w32_1x_CIHP/latest.pth 2 --eval segm  --show --show-dir work_dirs/insvis  --show-score-thr 0.3 --options "outfile_prefix=./work_dirs/json"
+
+./tools/dist_test.sh configs/solo/solo_r50_fpn_1x_MHP.py work_dirs/solo_r50_fpn_1x_MHP/latest.pth 1 --eval segm  --show --show-dir work_dirs/insvis  --show-score-thr 0.3 --options "outfile_prefix=./work_dirs/json"

@@ -253,7 +253,6 @@ class SOLOHead(nn.Module):
         flatten_ins_ind_labels = torch.cat(ins_ind_labels)
 
         num_ins = flatten_ins_ind_labels.sum()
-
         # dice loss
         loss_ins = []
         for input, target in zip(ins_pred_list, ins_labels):
@@ -281,7 +280,6 @@ class SOLOHead(nn.Module):
             0.963,1.0086,0.9588,0.9588,1.0607,1.0537,0.9556,0.9739,0.9735,\
             1.0328,1.0328,1.0184,1.0186]).expand(flatten_cate_preds.shape).to(flatten_cate_preds.device)'''
         loss_cate = self.loss_cate(flatten_cate_preds, flatten_cate_labels, avg_factor=num_ins + 1)
-        
         return dict(
             loss_ins=loss_ins,
             loss_cate=loss_cate)
@@ -297,17 +295,21 @@ class SOLOHead(nn.Module):
         # ins
         gt_areas = torch.sqrt((gt_bboxes_raw[:, 2] - gt_bboxes_raw[:, 0]) * (
                 gt_bboxes_raw[:, 3] - gt_bboxes_raw[:, 1]))
-
+        
+        # for cat,mask in zip(gt_labels_raw,gt_masks_raw):
+        #     print(cat)
+        #     plt.imshow(mask)
+        #     plt.show()
         ins_label_list = []
         cate_label_list = []
         ins_ind_label_list = []
         grid_order_list = []
+        
         for (lower_bound, upper_bound), stride, num_grid \
                 in zip(self.scale_ranges, self.strides, self.seg_num_grids):
 
             hit_indices = ((gt_areas >= lower_bound) & (gt_areas <= upper_bound)).nonzero().flatten()
             num_ins = len(hit_indices)
-
             ins_label = []
             grid_order = []
             cate_label = torch.ones([num_grid, num_grid], dtype=torch.int64, device=device)*self.num_classes
@@ -367,7 +369,6 @@ class SOLOHead(nn.Module):
             cate_label_list.append(cate_label)
             ins_ind_label_list.append(ins_ind_label)
             grid_order_list.append(grid_order)
-            
         return ins_label_list, cate_label_list, ins_ind_label_list, grid_order_list
 
     def get_seg(self, cate_preds, kernel_preds, seg_pred, img_metas, cfg, rescale=None):
