@@ -61,6 +61,7 @@ class MHPDataset(CocoDataset):
                  'Other-full-body-clothes',
                  'Headwear',
                  'Backpack',
+                 'Ball',
                  'Bats',
                  'Belt',
                  'Bottle',
