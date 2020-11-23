@@ -159,7 +159,8 @@ class SOLOHead(nn.Module):
         return (F.interpolate(feats[0], scale_factor=0.5, mode='bilinear'),
                 feats[1],
                 feats[2],
-                F.interpolate(feats[3], scale_factor=2, mode='bilinear'))
+                feats[3],
+                F.interpolate(feats[4], scale_factor=2, mode='bilinear'))
 
     def forward_single(self, x, idx, img_metas=None, eval=False, upsampled_size=None):
         ins_kernel_feat = x
