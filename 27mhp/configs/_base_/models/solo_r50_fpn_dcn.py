@@ -9,7 +9,12 @@ model=dict(
         frozen_stages=1,
         norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=True,
-        style='pytorch'),
+        style='pytorch',
+        dcn=dict(
+            type='DCNv2',
+            deformable_groups=1,
+            fallback_on_stride=False),
+        stage_with_dcn=(False, True, True, True)),
     neck=dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
@@ -26,6 +31,7 @@ model=dict(
         scale_ranges=((1, 48), (24, 96), (48, 192), (96, 2048)),
         #scale_ranges=((1, 96), (48, 192), (96, 384), (192, 768),(384,2048)),
         sigma=0.2,
+        conv_cfg=dict(type='DCNv2'),
         num_grids=[40, 36, 24, 16],
         ins_out_channels=256,
         loss_ins=dict(
@@ -45,6 +51,7 @@ model=dict(
         start_level=0,
         end_level=3,
         num_classes=256,
+        conv_cfg=dict(type='DCNv2'),
         norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)),
 )
 train_cfg=dict()
