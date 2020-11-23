@@ -53,12 +53,13 @@ class GloRe_Unit(nn.Module):
         'normalize' is not necessary if the input size is fixed
     """
 
-    def __init__(self, num_in, num_mid,
+    def __init__(self, num_human,num_in, num_mid,
                  ConvNd=nn.Conv3d,
                  BatchNormNd=nn.BatchNorm3d,
                  normalize=False):
         super(GloRe_Unit, self).__init__()
         self.normalize = normalize
+        self.num_human = num_human
         self.num_s = int(2 * num_mid)
         self.num_n = int(1 * num_mid)
 
@@ -66,30 +67,35 @@ class GloRe_Unit(nn.Module):
         self.conv_state = ConvNd(num_in, self.num_s, kernel_size=1)
         # projection map
         self.conv_proj = ConvNd(num_in, self.num_n, kernel_size=1)
+
+
         # ----------
         # reasoning via graph convolution
         self.gcn = GCN(num_state=self.num_s, num_node=self.num_n)
         # ----------
         # extend dimension
-        self.conv_extend = ConvNd(self.num_s, num_in, kernel_size=1, bias=False)
+        self.conv_extend = ConvNd(self.num_s, num_in//16, kernel_size=1)
+        self.recover = ConvNd(num_in // 16 *num_human, num_in, kernel_size=1, bias=False)
 
         self.blocker = BatchNormNd(num_in, eps=1e-04)  # should be zero initialized
 
-        self.sum_after = ConvNd(in_channels=num_in, out_channels=num_in,
-                           kernel_size=1, stride=1, padding=0)
 
-    def forward(self, feats_all=None,human_feats=None):
+    def forward(self, feats_all=None,human_pred=None):
         '''
         :param x: (n, c, d, h, w)
 
         '''
-        feat = self.sum_after(feats_all+human_feats)
+        batchsize,channels,h,w =feats_all.shape
+        human_pred=human_pred.unsqueeze(2)
+        feat=feats_all.unsuqeeze(1)
+        feat=feat*human_pred
+        feat=feat.reshape(batchsize*self.num_human,channels,h,w)
 
         n = feats_all.size(0)
 
         # (n, num_in, h, w) --> (n, num_state, h, w)
         #                   --> (n, num_state, h*w)
-        x_state_reshaped = self.conv_state(feats_all).view(n, self.num_s, -1)
+        x_state_reshaped = self.conv_state(feat).view(n, self.num_s, -1)
 
         # (n, num_in, h, w) --> (n, num_node, h, w)
         #                   --> (n, num_node, h*w)
@@ -121,7 +127,10 @@ class GloRe_Unit(nn.Module):
 
         # -----------------
         # (n, num_state, h, w) -> (n, num_in, h, w)
-        out = self.blocker(self.conv_extend(x_state))+feats_all
+        x_state = self.conv_extend(x_state)
+        x_state = x_state.reshape(batchsize,-1,h,w)
+        x_state = self.recover(x_state)
+        out = self.blocker(x_state)+feats_all
 
         return out
 
@@ -138,11 +147,11 @@ class GloRe_Unit_1D(GloRe_Unit):
 
 @HEADS.register_module
 class GloRe_Unit_2D(GloRe_Unit):
-    def __init__(self, num_in, num_mid, normalize=False):
+    def __init__(self, num_human, num_in, num_mid, normalize=False):
         """
         Set 'normalize = True' if the input size is not fixed
         """
-        super(GloRe_Unit_2D, self).__init__(num_in, num_mid,
+        super(GloRe_Unit_2D, self).__init__(num_human,num_in, num_mid,
                                             ConvNd=nn.Conv2d,
                                             BatchNormNd=nn.BatchNorm2d,
                                             normalize=normalize)
