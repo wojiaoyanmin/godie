@@ -7,7 +7,7 @@ model=dict(
     ins_head=dict(
         num_classes=58)#不算background
 )
-optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
+optimizer = dict(type='SGD', lr=0.002, momentum=0.9, weight_decay=0.0001)
 total_epochs = 12
 lr_config = dict(
     policy='step',
