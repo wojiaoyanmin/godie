@@ -55,4 +55,4 @@ test_cfg=dict(
     update_thr=0.1,#0.05,0.1
     kernel='gaussian',
     sigma=2.0,
-    max_per_img=50)
+    max_per_img=100)
