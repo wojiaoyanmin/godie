@@ -492,9 +492,7 @@ class SOLOHead(nn.Module):
                                   size=upsampled_size_out,
                                   mode='bilinear')[:, :, :h, :w]
         torch.cuda.empty_cache()
-        seg_masks = F.interpolate(F.interpolate(seg_preds.unsqueeze(0),
-                                  size=upsampled_size_out,
-                                  mode='bilinear')[:, :, :h, :w],
+        seg_masks = F.interpolate(seg_preds,
                                   size=ori_shape[:2],
                                   mode='bilinear').squeeze(0)
         seg_masks=seg_masks>cfg.mask_thr
