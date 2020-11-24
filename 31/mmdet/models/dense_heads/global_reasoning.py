@@ -81,9 +81,9 @@ class GloRe_Unit(nn.Module):
         self.gcn = GCN(num_state=self.num_s, num_node=self.num_n)
         # ----------
         # extend dimension
-        self.conv_extend = ConvNd(self.num_s, self.num_s, kernel_size=1)
-        self.recover = ConvNd(self.num_s *num_human, num_in, groups=self.num_s ,kernel_size=1, bias=False)
-
+        
+        self.recover = ConvNd(self.num_s *num_human, self.num_s, groups=self.num_s ,kernel_size=1, bias=False)
+        self.conv_extend = ConvNd(self.num_s, num_in, kernel_size=1)
         self.blocker = BatchNormNd(num_in, eps=1e-04)  # should be zero initialized
 
 
@@ -138,6 +138,7 @@ class GloRe_Unit(nn.Module):
         # -----------------
         # (n, num_state, h, w) -> (n, num_in, h, w)
         x_state = self.recover(x_state)
+        x_state = self.conv_extend(x_state)
         out = self.blocker(x_state)+feats_all
 
         return out
