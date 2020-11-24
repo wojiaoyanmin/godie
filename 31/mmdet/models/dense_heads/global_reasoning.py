@@ -7,6 +7,7 @@ import torch
 from mmcv.cnn import normal_init,bias_init_with_prob, ConvModule
 import torch.nn as nn
 import pdb
+import matplotlib.pyplot as plt
 
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
@@ -139,7 +140,15 @@ class GloRe_Unit(nn.Module):
         # (n, num_state, h, w) -> (n, num_in, h, w)
         x_state = self.recover(x_state)
         x_state = self.conv_extend(x_state)
-        out = self.blocker(x_state)+feats_all
+        for i in range(x_state.shape[1]):
+            plt.subplot(1,3,1)
+            plt.imshow(self.blocker(x_state)[0][i].cpu().numpy())
+            plt.subplot(1,3,2)
+            plt.imshow(feats_all[0][i].cpu().numpy())
+            plt.subplot(1,3,3)
+            plt.imshow((self.blocker(x_state)+feats_all)[0][i].cpu().numpy())
+            plt.show()
+        out = self.blocker(x_state)#+feats_all
 
         return out
 

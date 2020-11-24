@@ -144,6 +144,7 @@ class SOLOHead(nn.Module):
                     stride=1,
                     padding=0,
                     conv_cfg=None,
+                    act_cfg=None,
                     norm_cfg=norm_cfg,
                     bias=norm_cfg is None)
 
