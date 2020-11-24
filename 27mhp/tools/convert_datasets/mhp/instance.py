@@ -110,6 +110,8 @@ def load_img_info(files):
         Instance_name=osp.basename(Instance_file)[:-len(suffix)]
         instance_index,totoal_num,human_index=Instance_name.split('_')
         Instance_img = mmcv.imread(Instance_file, 'unchanged')[:,:,2]
+        if Instance_img is None:
+            print(Instance_file,'is none')
         category_ids = np.unique(Instance_img)
         instance_id=int(human_index)-1
         if instance_id<0:
