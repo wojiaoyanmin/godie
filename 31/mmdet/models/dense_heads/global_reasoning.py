@@ -82,7 +82,7 @@ class GloRe_Unit(nn.Module):
         # ----------
         # extend dimension
         self.conv_extend = ConvNd(self.num_s, self.num_s, kernel_size=1)
-        self.recover = ConvNd(self.num_s *num_human, num_in, groups=num_human ,kernel_size=1, bias=False)
+        self.recover = ConvNd(self.num_s *num_human, num_in, groups=self.num_s ,kernel_size=1, bias=False)
 
         self.blocker = BatchNormNd(num_in, eps=1e-04)  # should be zero initialized
 
@@ -132,8 +132,9 @@ class GloRe_Unit(nn.Module):
 
         # (n, num_state, h*w) --> (n, num_state, h, w)
         x_state = x_state_reshaped.view(batchsize, self.num_human, self.num_s, *feat.size()[2:])
-        x_state = x_state.reshape(0,2,1,3,4)
-        x_satate = x_satate.reshape(batchsize, self.num_s*self.num_human, *feat.size()[2:])
+        
+        x_state = x_state.permute(0,2,1,3,4)
+        x_state = x_state.reshape(batchsize, self.num_s*self.num_human, *feat.size()[2:])
         # -----------------
         # (n, num_state, h, w) -> (n, num_in, h, w)
         x_state = self.recover(x_state)
