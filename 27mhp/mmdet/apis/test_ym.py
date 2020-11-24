@@ -67,7 +67,7 @@ def vis_seg(data, result, img_norm_cfg, score_thr, save_dir):
     img_metas = data['img_metas'][0].data[0]
     imgs = tensor2imgs(img_tensor, **img_norm_cfg)
     assert len(imgs) == len(img_metas)
-    class_names = get_classes('CIHP')
+    class_names = get_classes('MHP')
 
     for img, img_meta, cur_result in zip(imgs, img_metas, result):
         if cur_result[0] is None:
@@ -118,11 +118,13 @@ def vis_seg(data, result, img_norm_cfg, score_thr, save_dir):
 
 
         
-        data_id=os.path.split(img_metas[0]['filename'])[-1]
-        mmcv.mkdir_or_exist(save_dir)
-        '''seg_show = PILImage.fromarray(seg_show)
-        seg_show.save(os.path.join(save_dir,data_id))'''
-        mmcv.imwrite(seg_show, os.path.join(save_dir,data_id))
+            data_id=os.path.split(img_metas[0]['filename'])[-1]
+            mmcv.mkdir_or_exist(save_dir)
+            '''seg_show = PILImage.fromarray(seg_show)
+            seg_show.save(os.path.join(save_dir,data_id))'''
+            mmcv.imwrite(seg_show, os.path.join(save_dir,data_id))
+            print(cur_score)
+            pdb.set_trace()
         
 
 

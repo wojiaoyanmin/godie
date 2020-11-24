@@ -487,11 +487,14 @@ class SOLOHead(nn.Module):
         seg_preds = seg_preds[sort_inds, :, :]
         cate_scores = cate_scores[sort_inds]
         cate_labels = cate_labels[sort_inds]
-
+        torch.cuda.empty_cache()
         seg_preds = F.interpolate(seg_preds.unsqueeze(0),
                                   size=upsampled_size_out,
                                   mode='bilinear')[:, :, :h, :w]
-        seg_masks = F.interpolate(seg_preds,
+        torch.cuda.empty_cache()
+        seg_masks = F.interpolate(F.interpolate(seg_preds.unsqueeze(0),
+                                  size=upsampled_size_out,
+                                  mode='bilinear')[:, :, :h, :w],
                                   size=ori_shape[:2],
                                   mode='bilinear').squeeze(0)
         seg_masks=seg_masks>cfg.mask_thr
@@ -507,14 +510,5 @@ class SOLOHead(nn.Module):
         for i in range(semantic_pred.shape[0]):
             semantic_mask[i][(semantic_pred[i]==se_max)&(semantic_pred[i]>0)]=1
         semantic_mask=semantic_mask>cfg.mask_thr'''
-        semantic_pred=torch.zeros([self.num_classes,ori_shape[0],ori_shape[1]],dtype=torch.bool, device=cate_preds.device)
-        for i in range(len(cate_labels)):
-            label=cate_labels[i]
-            mask=seg_masks[i]
-            
-            semantic_pred[label,...]=semantic_pred[label,...]|(mask & (torch.logical_not(torch.sum(semantic_pred,dim=0))))
-        
-        semantic_mask=semantic_pred     
-        sem_labels=torch.linspace(0,self.num_classes-1,self.num_classes,dtype=torch.int8)
-        sem_scores=torch.ones([self.num_classes],dtype=torch.uint8)
-        return seg_masks, cate_labels, cate_scores, semantic_mask,sem_labels,sem_scores
+
+        return seg_masks, cate_labels, cate_scores, None, None, None
