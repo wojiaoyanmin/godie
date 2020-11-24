@@ -4,7 +4,7 @@ _base_=[
     '../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py'
     ]
 
-optimizer = dict(type='SGD', lr=0.08, momentum=0.9, weight_decay=0.0001)
+optimizer = dict(type='SGD', lr=0.008, momentum=0.9, weight_decay=0.0001)
 total_epochs = 12
 lr_config = dict(
     policy='step',
