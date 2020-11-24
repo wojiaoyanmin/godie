@@ -102,7 +102,6 @@ class SOLOHead(nn.Module):
 
         for i in range(self.cate_stacked_convs):
             chn = self.in_channels if i == 0 else self.cate_feat_channels
-            act_cfg=None if i== self.cate_stacked_convs-1 else dict(type='ReLU')
             self.cate_convs.append(
                 ConvModule(
                     chn,
@@ -112,7 +111,6 @@ class SOLOHead(nn.Module):
                     padding=1,
                     conv_cfg=cfg_conv,
                     norm_cfg=norm_cfg,
-                    act_cfg =act_cfg,
                     bias=norm_cfg is None))
 
         self.cate_convs_after = nn.ModuleList()

@@ -118,14 +118,14 @@ class _NonLocalBlockND(nn.Module):
         g_x = g_x.permute(0, 2, 1)
 
         # theta_x = self.theta(query).view(batch_size, self.inter_channels, -1)
-        human_query = self.human_theta(human_feats).view(batch_size, self.inter_channels, -1).permute(0, 2, 1)
+        #human_query = self.human_theta(human_feats).view(batch_size, self.inter_channels, -1).permute(0, 2, 1)
         # theta_x=torch.cat([theta_x,human_query],dim=1)
         # theta_x = theta_x.permute(0, 2, 1)
         human_key =self.human_phi(human_feats).view(batch_size, self.inter_channels, -1)
         # phi_x = self.phi(key).view(batch_size, self.inter_channels, -1)
         # phi_x=torch.cat([phi_x,human_key],dim=1)
 
-        f = torch.matmul(human_query, human_key)
+        f = torch.matmul(human_key.permute(0, 2, 1), human_key)
 
         # f = (self.inter_channels*2 ** -.5) * f   
         f = F.softmax(f, dim=-1)
